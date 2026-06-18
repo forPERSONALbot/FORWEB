@@ -40,10 +40,16 @@
 
     <script>
         // ========== CONFIG ==========
-        const API = 'https://limit-crispness-uncork.ngrok-free.dev';   // <--- apna ngrok URL (bina slash)
+        const API = 'https://limit-crispness-uncork.ngrok-free.dev';   // apna ngrok URL (bina slash)
         const tg = Telegram.WebApp;
         tg.ready();
-        const userId = tg.initDataUnsafe?.user?.id || null;
+
+        // 1. Try Telegram initData, fallback to URL parameter
+        let userId = tg.initDataUnsafe?.user?.id || null;
+        if (!userId) {
+            const params = new URLSearchParams(window.location.search);
+            userId = params.get('user_id');
+        }
 
         if (!userId) {
             document.body.innerHTML = '<p style="color:red;">❌ Could not get user ID. Please open via bot.</p>';
